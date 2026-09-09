@@ -29,4 +29,4 @@
 
 ## 验证边界
 
-当前容器无法下载 Gradle，完整 Android 构建交给 GitHub Actions。安装、三星语音切换、真实笔迹准确率、快速切换候选筛选需在手机验证。以该提交对应的 Actions 结果判断编译状态。
+当前容器无法下载 Gradle。尝试提交 GitHub 时，连接器写入 Git Tree 返回 403 Resource not accessible by integration，所以尚未 push、没有触发 GitHub Actions，也没有 APK 产物。工作流已经写入代码，获得写入授权并推送后才会编译。安装、三星语音切换、真实笔迹准确率、快速切换候选筛选需在手机验证。以该提交对应的 Actions 结果判断编译状态。
