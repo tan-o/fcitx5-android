@@ -77,6 +77,7 @@ ksp {
 }
 
 dependencies {
+    implementation("com.google.mlkit:digital-ink-recognition:19.0.0")
     ksp(project(":codegen"))
     implementation(project(":lib:fcitx5"))
     implementation(project(":lib:fcitx5-lua"))

@@ -1,17 +1,7 @@
-# Handwriting model
+# 手写输入
 
-`handwriting-zh_CN.model` is not committed here (26 MB binary). Drop it in
-this directory before building; without it the handwriting window only shows
-a "model not installed" notice.
+使用 ML Kit Digital Ink 19.0.0 的 zh-Hans 模型。打开手写窗口后点击提示下载模型；需要能访问 Google 的网络，下载完成后在设备本地识别，不再需要联网识别。
 
-    curl -Lo app/src/main/assets/handwriting/handwriting-zh_CN.model \
-      https://raw.githubusercontent.com/alexrao/zinnia-handwriting/master/res/handwriting-zh_CN.model
+不再使用 zinnia，也不需要在构建时下载 26 MB 模型。pinyin.txt 用于候选读音标注，来源为 mozillazg/pinyin-data 的通规字常用读音。多音字显示常用音，不是上下文注音。
 
-It is the Tegaki/zinnia simplified-chinese model: 6763 characters (GB2312
-level 1 + 2), format version 1, recognized by the vendored zinnia under
-`app/src/main/cpp/zinnia` (BSD).
-
-`pinyin.txt` annotates candidates with the most common reading of each of the
-8105 characters of 通用规范汉字表, generated from
-[mozillazg/pinyin-data](https://github.com/mozillazg/pinyin-data)
-(`kMandarin_8105.txt`).
+官方集成文档：https://developers.google.com/ml-kit/vision/digital-ink-recognition/android

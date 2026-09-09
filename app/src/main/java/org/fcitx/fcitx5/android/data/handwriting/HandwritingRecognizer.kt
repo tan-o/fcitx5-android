@@ -4,73 +4,59 @@
  */
 package org.fcitx.fcitx5.android.data.handwriting
 
-import org.fcitx.fcitx5.android.core.data.DataManager
-import java.io.File
+import com.google.android.gms.tasks.Task
+import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.common.model.RemoteModelManager
+import com.google.mlkit.vision.digitalink.DigitalInkRecognition
+import com.google.mlkit.vision.digitalink.DigitalInkRecognitionModel
+import com.google.mlkit.vision.digitalink.DigitalInkRecognitionModelIdentifier
+import com.google.mlkit.vision.digitalink.DigitalInkRecognizerOptions
+import com.google.mlkit.vision.digitalink.Ink
+import com.google.mlkit.vision.digitalink.RecognitionContext
+import com.google.mlkit.vision.digitalink.WritingArea
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
-/**
- * Online handwriting recognition, backed by zinnia and the Tegaki
- * simplified-chinese model installed at [MODEL_PATH] under the data dir.
- */
-object HandwritingRecognizer {
+/** One recognizer per handwriting window; recognition stays on device. */
+class HandwritingRecognizer : AutoCloseable {
+    data class Point(val x: Float, val y: Float, val time: Long)
 
-    const val MODEL_PATH = "handwriting/handwriting-zh_CN.model"
+    private val model = DigitalInkRecognitionModel.builder(
+        checkNotNull(DigitalInkRecognitionModelIdentifier.fromLanguageTag("zh-Hans"))
+    ).build()
+    private val modelManager = RemoteModelManager.getInstance()
+    private val client = DigitalInkRecognition.getClient(
+        DigitalInkRecognizerOptions.builder(model).build()
+    )
 
-    init {
-        System.loadLibrary("native-lib")
+    suspend fun isReady(): Boolean = modelManager.isModelDownloaded(model).awaitResult()
+
+    suspend fun download() {
+        modelManager.download(model, DownloadConditions.Builder().build()).awaitResult()
     }
 
-    private var handle = 0L
-
-    val modelFile: File
-        get() = File(DataManager.dataDir, MODEL_PATH)
-
-    @Synchronized
-    fun open(): Boolean {
-        if (handle != 0L) return true
-        val model = modelFile
-        if (!model.exists()) return false
-        handle = nativeOpen(model.absolutePath)
-        return handle != 0L
+    suspend fun classify(width: Int, height: Int, strokes: List<List<Point>>): List<String> {
+        if (width <= 0 || height <= 0 || strokes.isEmpty()) return emptyList()
+        val ink = Ink.builder().apply {
+            strokes.filter { it.isNotEmpty() }.forEach { points ->
+                addStroke(Ink.Stroke.builder().apply {
+                    points.forEach { addPoint(Ink.Point.create(it.x, it.y, it.time)) }
+                }.build())
+            }
+        }.build()
+        val context = RecognitionContext.builder()
+            .setWritingArea(WritingArea(width.toFloat(), height.toFloat()))
+            .build()
+        return client.recognize(ink, context).awaitResult().candidates
+            .map { it.text }.filter { it.isNotBlank() }.distinct().take(10)
     }
 
-    @Synchronized
-    fun close() {
-        if (handle == 0L) return
-        nativeClose(handle)
-        handle = 0L
+    override fun close() = client.close()
+
+    private suspend fun <T> Task<T>.awaitResult(): T = suspendCancellableCoroutine { continuation ->
+        addOnSuccessListener { if (continuation.isActive) continuation.resume(it) }
+        addOnFailureListener { if (continuation.isActive) continuation.resumeWithException(it) }
+        addOnCanceledListener { continuation.cancel() }
     }
-
-    /**
-     * Classify [strokes], each of which is a flat list of x, y in canvas
-     * coordinates. Returns the n-best characters, most confident first.
-     */
-    @Synchronized
-    fun classify(
-        width: Int,
-        height: Int,
-        strokes: List<List<Int>>,
-        nbest: Int = 10
-    ): List<String> {
-        if (handle == 0L || strokes.isEmpty()) return emptyList()
-        val flat = ArrayList<Int>(strokes.sumOf { it.size } + strokes.size + 1)
-        flat.add(strokes.size)
-        strokes.forEach {
-            flat.add(it.size / 2)
-            flat.addAll(it)
-        }
-        return nativeClassify(handle, width, height, flat.toIntArray(), nbest)
-            ?.toList() ?: emptyList()
-    }
-
-    private external fun nativeOpen(model: String): Long
-
-    private external fun nativeClose(handle: Long)
-
-    private external fun nativeClassify(
-        handle: Long,
-        width: Int,
-        height: Int,
-        strokes: IntArray,
-        nbest: Int
-    ): Array<String>?
 }

@@ -62,11 +62,10 @@
     <string name="delete">删除</string>
     <string name="clipboard">剪贴板</string>
     <string name="candidate_filter_none">全部</string>
-    <string name="candidate_filter_radical">部首</string>
-    <string name="candidate_filter_strokes">笔画</string>
+    <string name="candidate_filter_radical">部首·前500项</string>
+    <string name="candidate_filter_strokes">笔画·前500项</string>
     <string name="handwriting">手写</string>
     <string name="handwriting_clear">清除笔迹</string>
-    <string name="handwriting_model_missing">未安装手写模型。请把 handwriting-zh_CN.model 放到 app/src/main/assets/handwriting/ 后重新编译。</string>
     <string name="clipboard_tab_recent">最近</string>
     <string name="clipboard_tab_pinned">已固定</string>
     <string name="clipboard_search">搜索剪贴板</string>
@@ -331,4 +330,13 @@
     <string name="keyboard_height_percent_base">键盘高度百分比</string>
     <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
     <string name="real_size">真实尺寸 (Display.getRealSize)</string>
+    <string name="handwriting_model_checking">正在检查手写模型…</string>
+    <string name="handwriting_model_download">点击下载中文手写模型，下载后可离线使用</string>
+    <string name="handwriting_model_downloading">正在下载手写模型…</string>
+    <string name="handwriting_model_retry">下载失败，请确认网络可访问 Google，点击重试</string>
+    <string name="handwriting_hint">在下方手写，点击候选即可输入</string>
+    <string name="handwriting_recognition_retry">识别失败，请继续写一笔或清空重试</string>
+    <string name="handwriting_undo">撤销一笔／退格</string>
+    <string name="clipboard_search_hint">搜索文字、拼音或首字母 · 长按粘贴关键词</string>
+    <string name="clipboard_no_results">没有找到匹配的剪贴板内容</string>
 </resources>

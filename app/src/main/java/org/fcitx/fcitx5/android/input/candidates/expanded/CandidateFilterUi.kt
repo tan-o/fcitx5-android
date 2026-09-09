@@ -10,6 +10,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.LayerDrawable
 import android.graphics.drawable.ShapeDrawable
 import android.graphics.drawable.shapes.RectShape
+import android.view.View
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.HorizontalScrollView
@@ -78,6 +79,7 @@ class CandidateFilterUi(override val ctx: Context, private val theme: Theme) : U
     }
 
     override val root = LinearLayout(ctx).apply {
+        id = View.generateViewId()
         orientation = LinearLayout.HORIZONTAL
         addView(
             modeButton,

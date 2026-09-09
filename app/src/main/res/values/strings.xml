@@ -62,11 +62,10 @@
     <string name="delete">Delete</string>
     <string name="clipboard">Clipboard</string>
     <string name="candidate_filter_none">All</string>
-    <string name="candidate_filter_radical">Radical</string>
-    <string name="candidate_filter_strokes">Strokes</string>
+    <string name="candidate_filter_radical">Radical · first 500</string>
+    <string name="candidate_filter_strokes">Strokes · first 500</string>
     <string name="handwriting">Handwriting</string>
     <string name="handwriting_clear">Clear strokes</string>
-    <string name="handwriting_model_missing">Handwriting model not installed. Put handwriting-zh_CN.model under app/src/main/assets/handwriting/ and rebuild.</string>
     <string name="clipboard_tab_recent">Recent</string>
     <string name="clipboard_tab_pinned">Pinned</string>
     <string name="clipboard_search">Search clipboard</string>
@@ -331,4 +330,13 @@
     <string name="keyboard_height_percent_base">Keyboard height percent base</string>
     <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
     <string name="real_size">Real size (Display.getRealSize)</string>
+    <string name="handwriting_model_checking">Checking handwriting model…</string>
+    <string name="handwriting_model_download">Tap to download Chinese handwriting model. Recognition then works offline.</string>
+    <string name="handwriting_model_downloading">Downloading model…</string>
+    <string name="handwriting_model_retry">Download failed. Check access to Google, then tap to retry.</string>
+    <string name="handwriting_hint">Write here; tap a candidate to insert it</string>
+    <string name="handwriting_recognition_retry">Recognition failed. Add a stroke or clear and retry.</string>
+    <string name="handwriting_undo">Undo stroke / backspace</string>
+    <string name="clipboard_search_hint">Search text, pinyin or initials · hold to paste</string>
+    <string name="clipboard_no_results">No matching clipboard entries</string>
 </resources>

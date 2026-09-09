@@ -27,6 +27,15 @@ object HandwritingPinyin {
         }.getOrDefault(emptyMap())
     }
 
+    fun ofText(text: String): String = buildList {
+        var offset = 0
+        while (offset < text.length) {
+            val cp = text.codePointAt(offset)
+            add(table[cp] ?: String(Character.toChars(cp)))
+            offset += Character.charCount(cp)
+        }
+    }.joinToString(" ")
+
     fun of(char: String): String? {
         if (char.isEmpty()) return null
         return table[char.codePointAt(0)]

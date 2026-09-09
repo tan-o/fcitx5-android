@@ -102,6 +102,3 @@ lint/tmp/
 
 ### Kotlin ###
 .kotlin/
-
-# handwriting model, fetched at build time (26 MB)
-app/src/main/assets/handwriting/handwriting-zh_CN.model

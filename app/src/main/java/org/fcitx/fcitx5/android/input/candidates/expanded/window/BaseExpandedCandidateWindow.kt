@@ -14,6 +14,10 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import timber.log.Timber
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.core.CandidateAction
@@ -29,6 +33,7 @@ import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
 import org.fcitx.fcitx5.android.input.candidates.CandidateViewHolder
+import org.fcitx.fcitx5.android.input.candidates.expanded.IndexedCandidate
 import org.fcitx.fcitx5.android.input.candidates.expanded.CandidateFilterMode
 import org.fcitx.fcitx5.android.input.candidates.expanded.CandidateTabActionsAdapter
 import org.fcitx.fcitx5.android.input.candidates.expanded.CandidatesPagingSource
@@ -55,8 +60,8 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     companion object {
         /**
-         * Grouping needs the whole candidate list at once, so it is bounded:
-         * nobody scrolls past this many looking for one 字.
+         * Bound the snapshot to keep filtering responsive. The UI states this limit;
+         * normal paging still exposes the complete candidate list.
          */
         const val MaxFilterCandidates = 500
     }
@@ -88,39 +93,48 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     private var filterMode = CandidateFilterMode.None
 
-    private var allCandidates: List<CandidateWord> = emptyList()
+    private var allCandidates: List<IndexedCandidate> = emptyList()
 
     private var filterJob: Job? = null
 
     private fun cycleFilterMode() {
         filterMode = filterMode.next()
-        candidateLayout.filterUi.setMode(filterMode)
+        val mode = filterMode
+        val generation = adapter.generation
+        candidateLayout.filterUi.setMode(mode)
+        candidateLayout.filterUi.setChips(emptyList())
         filterJob?.cancel()
-        if (filterMode == CandidateFilterMode.None) {
-            candidateLayout.filterUi.setChips(emptyList())
-            clearFilter()
-            return
-        }
+        allCandidates = emptyList()
+        clearFilter()
+        if (mode == CandidateFilterMode.None) return
         filterJob = service.lifecycleScope.launch {
-            val total = horizontalCandidate.adapter.total
-            val limit =
-                if (total in 1..MaxFilterCandidates) total else MaxFilterCandidates
-            allCandidates = fcitx.runOnReady { getCandidates(0, limit) }.toList()
-            candidateLayout.filterUi.setChips(chipsOf(allCandidates))
+            try {
+                val total = horizontalCandidate.adapter.total
+                val limit = if (total in 1..MaxFilterCandidates) total else MaxFilterCandidates
+                val snapshot = fcitx.runOnReady { getCandidates(0, limit) }
+                    .mapIndexed { index, word -> IndexedCandidate(index, word, generation) }
+                val chips = withContext(Dispatchers.Default) { chipsOf(snapshot, mode) }
+                if (filterMode != mode || adapter.generation != generation) return@launch
+                allCandidates = snapshot
+                candidateLayout.filterUi.setChips(chips)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.w(e, "Candidate filtering failed")
+                resetFilterMode()
+            }
         }
     }
 
-    private fun chipsOf(candidates: List<CandidateWord>): List<String> =
-        when (filterMode) {
+    private fun chipsOf(candidates: List<IndexedCandidate>, mode: CandidateFilterMode): List<String> =
+        when (mode) {
             CandidateFilterMode.Radical -> candidates
-                .mapNotNull { HanziIndex.of(it.text)?.radical }
+                .mapNotNull { HanziIndex.of(it.candidate.text)?.radical }
                 .distinct()
                 .sortedWith(compareBy({ HanziIndex.radicalStrokes(it) }, { it }))
             CandidateFilterMode.Strokes -> candidates
-                .mapNotNull { HanziIndex.of(it.text)?.strokes }
-                .distinct()
-                .sorted()
-                .map { it.toString() }
+                .mapNotNull { HanziIndex.of(it.candidate.text)?.strokes }
+                .distinct().sorted().map { it.toString() }
             CandidateFilterMode.None -> emptyList()
         }
 
@@ -138,39 +152,32 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
             clearFilter()
             return
         }
-        val matched = ArrayList<CandidateWord>()
-        val indices = ArrayList<Int>()
-        allCandidates.forEachIndexed { index, candidate ->
-            if (keyOf(candidate) == chip) {
-                matched.add(candidate)
-                indices.add(index)
-            }
+        val matched = allCandidates.filter {
+            it.generation == adapter.generation && keyOf(it.candidate) == chip
         }
-        // stop the pager from overwriting the filtered list
         candidatesSubmitJob?.cancel()
-        candidatesSubmitJob = null
-        adapter.indices = indices
         candidateLayout.resetPosition()
-        service.lifecycleScope.launch {
+        // Each item carries its original index and input generation. There is no
+        // independently mutable side table racing PagingDataAdapter's async diff.
+        candidatesSubmitJob = service.lifecycleScope.launch {
             adapter.submitData(PagingData.from(matched))
         }
     }
 
     private fun clearFilter() {
-        adapter.indices = null
         candidateLayout.resetPosition()
         startCandidatesSubmitJob()
     }
 
     private fun resetFilterMode() {
-        if (filterMode == CandidateFilterMode.None) return
+        val wasFiltering = filterMode != CandidateFilterMode.None
         filterMode = CandidateFilterMode.None
         filterJob?.cancel()
         filterJob = null
         allCandidates = emptyList()
         candidateLayout.filterUi.setMode(filterMode)
         candidateLayout.filterUi.setChips(emptyList())
-        clearFilter()
+        if (wasFiltering) clearFilter()
     }
 
     private fun startCandidatesSubmitJob() {
@@ -255,7 +262,8 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
                 CandidatesPagingSource(
                     fcitx,
                     total = horizontalCandidate.adapter.total,
-                    offset = adapter.offset
+                    offset = adapter.offset,
+                    generation = adapter.generation
                 )
             }
         )
@@ -279,7 +287,10 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
                     windowManager.attachWindow(KeyboardWindow)
                 } else {
                     candidateLayout.resetPosition()
-                    adapter.refreshWithOffset(it)
+                    if (it != adapter.offset) {
+                        adapter.refreshWithOffset(it)
+                        resetFilterMode()
+                    }
                 }
             }
         }
@@ -288,11 +299,19 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     fun bindCandidateUiViewHolder(holder: CandidateViewHolder) {
         holder.itemView.setOnClickListener {
-            fcitx.launchOnReady { it.select(holder.idx) }
+            if (adapter.canSelect(holder)) {
+                val index = holder.idx
+                val generation = adapter.generation
+                fcitx.launchOnReady {
+                    if (generation == adapter.generation) it.select(index)
+                }
+            }
         }
         holder.itemView.setOnLongClickListener {
-            inputView.showCandidateActionMenu(holder.idx, holder.candidate.text, holder.ui.root)
-            true
+            if (adapter.canSelect(holder)) {
+                inputView.showCandidateActionMenu(holder.idx, holder.candidate.text, holder.ui.root)
+                true
+            } else false
         }
     }
 
@@ -308,6 +327,11 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
         )
         candidatesSubmitJob?.cancel()
         filterJob?.cancel()
+        adapter.invalidateCandidates()
+        filterMode = CandidateFilterMode.None
+        allCandidates = emptyList()
+        candidateLayout.filterUi.setMode(filterMode)
+        candidateLayout.filterUi.setChips(emptyList())
         offsetJob?.cancel()
         candidateLayout.embeddedKeyboard.keyActionListener = null
     }
@@ -320,7 +344,7 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     override fun onInputPanelUpdate(data: FcitxEvent.InputPanelEvent.Data) {
         updateTabs(data.tabs)
-        // the candidate list changed under us, any grouping of it is stale
+        adapter.refreshWithOffset(adapter.offset)
         resetFilterMode()
     }
 
