@@ -30,8 +30,16 @@ open class PagingCandidateViewAdapter(val theme: Theme) :
     var offset = 0
         private set
 
+    /**
+     * Original candidate index of each visible item, set while the list is
+     * filtered: the visible candidates are no longer contiguous, but selecting
+     * one still has to use its index in fcitx's own list.
+     */
+    var indices: List<Int>? = null
+
     fun refreshWithOffset(offset: Int) {
         this.offset = offset
+        indices = null
         refresh()
     }
 
@@ -41,6 +49,7 @@ open class PagingCandidateViewAdapter(val theme: Theme) :
 
     override fun onBindViewHolder(holder: CandidateViewHolder, position: Int) {
         val candidate = getItem(position) ?: CandidateWord.Empty
-        holder.update(position + offset, candidate)
+        val idx = indices?.getOrNull(position) ?: (position + offset)
+        holder.update(idx, candidate)
     }
 }

@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.utils.singleSideBorderDrawable
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
 import splitties.views.dsl.constraintlayout.above
+import splitties.views.dsl.constraintlayout.below
 import splitties.views.dsl.constraintlayout.bottomOfParent
 import splitties.views.dsl.constraintlayout.centerHorizontally
 import splitties.views.dsl.constraintlayout.constraintLayout
@@ -102,6 +103,8 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
         setVerticalScrollbarThumbColor(theme.candidateTextColor)
     }
 
+    val filterUi = CandidateFilterUi(context, theme)
+
     val pinnedTabs = recyclerView {
         itemAnimator = null
         // prevent scrolling in pinned tabs at bottom
@@ -148,8 +151,13 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
                 centerHorizontally()
             })
         }
-        add(recyclerView, lParams {
+        add(filterUi.root, lParams(height = dp(34)) {
             topOfParent()
+            leftToRightOf(tabsContainer)
+            rightToLeftOf(embeddedKeyboard)
+        })
+        add(recyclerView, lParams {
+            below(filterUi.root)
             leftToRightOf(tabsContainer)
             rightToLeftOf(embeddedKeyboard)
             bottomOfParent()
