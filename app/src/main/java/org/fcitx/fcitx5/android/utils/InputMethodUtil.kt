@@ -46,42 +46,43 @@ object InputMethodUtil {
 
     fun showPicker() = appContext.inputMethodManager.showInputMethodPicker()
 
-    fun listVoiceInputMethods(): List<Pair<InputMethodInfo, InputMethodSubtype>> {
+    /**
+     * Every enabled input method except ourselves, paired with its `"voice"`
+     * subtype when it declares one.
+     *
+     * Not every voice input declares a `"voice"` subtype -- Samsung's does not
+     * on some devices -- so the list is deliberately not filtered by that.
+     */
+    fun listSwitchTargets(): List<Pair<InputMethodInfo, InputMethodSubtype?>> {
         return appContext.inputMethodManager.enabledInputMethodList
-            .mapNotNull { info ->
-                info.firstVoiceSubtype()?.let { info to it }
-            }
+            .filterNot { it.packageName == BuildConfig.APPLICATION_ID }
+            .map { it to it.firstVoiceSubtype() }
     }
 
     /**
-     * Find input method with `"voice"` subtype, preferring one with [id]
+     * The input method to switch to, preferring the one with [id]. An empty
+     * [id] means "pick one", which is the first target declaring a voice
+     * subtype. The subtype is null when the target declares none, in which
+     * case it is switched to without selecting a subtype.
      */
-    fun findVoiceSubtype(id: String): Pair<String, InputMethodSubtype>? {
-        val inputMethods = appContext.inputMethodManager.enabledInputMethodList
-        if (inputMethods.isEmpty()) return null
-        var firstId: String? = null
-        var firstSubtype: InputMethodSubtype? = null
-        inputMethods.forEach {
-            val voiceSubtype = it.firstVoiceSubtype() ?: return@forEach
-            if (it.id == id) {
-                return id to voiceSubtype
-            }
-            if (firstId == null) {
-                firstId = it.id
-                firstSubtype = voiceSubtype
-            }
+    fun findSwitchTarget(id: String): Pair<String, InputMethodSubtype?>? {
+        val targets = listSwitchTargets()
+        targets.find { (info, _) -> info.id == id }?.let { (info, subtype) ->
+            return info.id to subtype
         }
-        if (firstId != null && firstSubtype != null) {
-            return firstId to firstSubtype
-        }
-        return null
+        val withVoice = targets.find { (_, subtype) -> subtype != null } ?: return null
+        return withVoice.first.id to withVoice.second
     }
 
     fun switchInputMethod(
         service: FcitxInputMethodService,
         id: String,
-        subtype: InputMethodSubtype
+        subtype: InputMethodSubtype?
     ) {
+        if (subtype == null) {
+            service.switchInputMethod(id)
+            return
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             service.switchInputMethod(id, subtype)
         } else {

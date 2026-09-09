@@ -85,11 +85,16 @@ abstract class ManagedPreferenceUi<T : Preference>(
             setDefaultValue(defaultValue)
             setTitle(this@VoiceInputList.title)
             setDialogTitle(this@VoiceInputList.title)
-            val voiceInputMethods = InputMethodUtil.listVoiceInputMethods()
-            entryValues = arrayOf("", *voiceInputMethods.map { it.first.id }.toTypedArray())
+            val targets = InputMethodUtil.listSwitchTargets()
+            entryValues = arrayOf("", *targets.map { it.first.id }.toTypedArray())
             entries = arrayOf(
                 context.getString(R.string.system_default),
-                *voiceInputMethods.map { it.first.loadLabel(context.packageManager) }.toTypedArray()
+                *targets.map { (info, subtype) ->
+                    val label = info.loadLabel(context.packageManager)
+                    // mark the ones actually declaring a voice subtype, so a
+                    // device hiding its voice input is diagnosable from here
+                    if (subtype != null) "$label \u2022 ${context.getString(R.string.voice_subtype)}" else label
+                }.toTypedArray()
             )
             // shows "(Not Available)" if selected id is not present
             summaryProvider = Preference.SummaryProvider<ListPreference> { preference ->
