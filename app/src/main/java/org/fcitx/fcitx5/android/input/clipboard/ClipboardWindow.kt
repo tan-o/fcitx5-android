@@ -82,10 +82,20 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
     private val clipboardEntryRadius by ThemeManager.prefs.clipboardEntryRadius
 
-    private val clipboardEntriesPager by lazy {
-        Pager(PagingConfig(pageSize = 16)) { ClipboardManager.allEntries() }
-    }
     private var adapterSubmitJob: Job? = null
+
+    private fun submitTabEntries(tab: ClipboardTab) {
+        adapterSubmitJob?.cancel()
+        val pager = Pager(PagingConfig(pageSize = 16)) {
+            when (tab) {
+                ClipboardTab.Recent -> ClipboardManager.recentEntries()
+                ClipboardTab.Pinned -> ClipboardManager.pinnedEntries()
+            }
+        }
+        adapterSubmitJob = service.lifecycleScope.launch {
+            pager.flow.collect { adapter.submitData(it) }
+        }
+    }
 
     private val adapter: ClipboardAdapter by lazy {
         object : ClipboardAdapter(
@@ -163,6 +173,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             enableUi.enableButton.setOnClickListener {
                 clipboardEnabledPref.setValue(true)
             }
+            tabsUi.onTabSelected = { submitTabEntries(it) }
             deleteAllButton.setOnClickListener {
                 service.lifecycleScope.launch {
                     promptDeleteAll(ClipboardManager.haveUnpinned())
@@ -268,11 +279,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             val empty = it.append.endOfPaginationReached && adapter.itemCount < 1
             stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to empty)
         }
-        adapterSubmitJob = service.lifecycleScope.launch {
-            clipboardEntriesPager.flow.collect {
-                adapter.submitData(it)
-            }
-        }
+        submitTabEntries(ui.tabsUi.activeTab)
         clipboardEnabledPref.registerOnChangeListener(clipboardEnabledListener)
     }
 

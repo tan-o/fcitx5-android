@@ -1,0 +1,58 @@
+name: Build Mods (debug)
+
+on:
+  push:
+    branches: [feat/mods]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android environment
+        uses: android-actions/setup-android@v4
+
+      - name: Install CMake
+        run: sdkmanager --install "cmake;3.31.6"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y extra-cmake-modules gettext
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # debug variant keeps applicationId org.fcitx.fcitx5.android.debug,
+      # so it installs side by side with the official build.
+      # app and plugin are built in the same job on purpose: they share the
+      # same debug keystore, which the signature-level plugin permission needs.
+      - name: Build debug APKs
+        run: |
+          ./gradlew :app:assembleDebug
+          ./gradlew :plugin:rime:assembleDebug
+
+      - name: Collect APKs
+        run: |
+          mkdir -p apks
+          cp app/build/outputs/apk/debug/*.apk apks/
+          cp plugin/rime/build/outputs/apk/debug/*.apk apks/
+          ls -la apks
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: fcitx5-android-mods-debug
+          path: apks

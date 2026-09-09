@@ -102,7 +102,9 @@ object ClipboardManager : ClipboardManager.OnPrimaryClipChangedListener,
 
     suspend fun haveUnpinned() = clbDao.haveUnpinned()
 
-    fun allEntries() = clbDao.allEntries()
+    fun recentEntries() = clbDao.recentEntries()
+
+    fun pinnedEntries() = clbDao.pinnedEntries()
 
     suspend fun pin(id: Int) = clbDao.updatePinStatus(id, true)
 
