@@ -52,7 +52,7 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
             return TextView(context).apply {
                 text = context.getString(R.string.handwriting_model_missing)
                 gravity = Gravity.CENTER
-                setPadding(dp(24), dp(24), dp(24), dp(24))
+                setPadding(context.dp(24), context.dp(24), context.dp(24), context.dp(24))
                 setTextColor(theme.keyTextColor)
             }
         }
@@ -79,7 +79,7 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
             backgroundColor = theme.keyboardColor
             addView(
                 scroll,
-                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48))
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, context.dp(48))
             )
             addView(
                 canvas,
@@ -128,7 +128,7 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(dp(12), 0, dp(12), 0)
+            setPadding(context.dp(12), 0, context.dp(12), 0)
             addView(
                 charView,
                 LinearLayout.LayoutParams(

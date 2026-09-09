@@ -88,7 +88,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
     private var adapterSubmitJob: Job? = null
 
-    private var searching = false
+    private var inSearchMode = false
 
     private var searchQuery = ""
 
@@ -101,7 +101,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     }
 
     private fun setSearching(on: Boolean) {
-        searching = on
+        inSearchMode = on
         searchQuery = ""
         ui.setSearchMode(on)
         ui.updateSearchQuery("")
@@ -221,7 +221,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             tabsUi.onTabSelected = { submitTabEntries(it) }
             searchKeyboard.keyActionListener = searchKeyActionListener
             searchButton.setOnClickListener {
-                setSearching(!searching)
+                setSearching(!inSearchMode)
             }
             deleteAllButton.setOnClickListener {
                 service.lifecycleScope.launch {
@@ -334,7 +334,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     }
 
     override fun onDetached() {
-        searching = false
+        inSearchMode = false
         searchQuery = ""
         ui.setSearchMode(false)
         clipboardEnabledPref.unregisterOnChangeListener(clipboardEnabledListener)
