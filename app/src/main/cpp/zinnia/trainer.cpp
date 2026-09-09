@@ -5,6 +5,7 @@
 //
 //  Copyright(C) 2008 Taku Kudo <taku@chasen.org>
 //
+#include <cstring>  // vendored: clang needs this explicitly
 #include <vector>
 #include <iostream>
 #include <fstream>

@@ -12,6 +12,7 @@
 //
 //  Copyright(C) 2005-2007 Taku Kudo <taku@chasen.org>
 //
+#include <cstring>  // vendored: clang needs this explicitly
 #include <fstream>
 #include <cstdio>
 #include "param.h"
