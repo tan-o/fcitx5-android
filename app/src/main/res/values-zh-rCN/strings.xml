@@ -63,6 +63,7 @@
     <string name="clipboard">剪贴板</string>
     <string name="clipboard_tab_recent">最近</string>
     <string name="clipboard_tab_pinned">已固定</string>
+    <string name="clipboard_search">搜索剪贴板</string>
     <string name="keyboard_height">键盘高度</string>
     <string name="virtual_keyboard">虚拟键盘</string>
     <string name="clipboard_suggestion_timeout">剪贴板提示超时</string>

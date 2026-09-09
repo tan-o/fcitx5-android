@@ -5,6 +5,7 @@
 package org.fcitx.fcitx5.android.input.clipboard
 
 import android.content.Context
+import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ViewAnimator
@@ -15,6 +16,7 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
+import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
 import splitties.views.dsl.coordinatorlayout.coordinatorLayout
@@ -24,6 +26,7 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.core.horizontalLayout
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import splitties.views.dsl.core.textView
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.view
 import splitties.views.dsl.recyclerview.recyclerView
@@ -47,12 +50,29 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     val tabsUi = ClipboardTabsUi(ctx, theme)
 
+    val searchBar = textView {
+        textSize = 14f
+        isSingleLine = true
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(12), 0, dp(12), 0)
+        setTextColor(theme.keyTextColor)
+        visibility = View.GONE
+    }
+
+    val searchKeyboard = TextKeyboard(ctx, theme).apply {
+        visibility = View.GONE
+    }
+
+    private var searching = false
+
     private val keyBorder by ThemeManager.prefs.keyBorder
     private val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation
 
     private val content = verticalLayout {
         addView(tabsUi.root, LinearLayout.LayoutParams(matchParent, dp(36)))
+        addView(searchBar, LinearLayout.LayoutParams(matchParent, dp(36)))
         addView(viewAnimator, LinearLayout.LayoutParams(matchParent, 0, 1f))
+        addView(searchKeyboard, LinearLayout.LayoutParams(matchParent, 0, 1.6f))
     }
 
     override val root = coordinatorLayout {
@@ -66,8 +86,24 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
         contentDescription = ctx.getString(R.string.delete_all)
     }
 
+    val searchButton = ToolButton(ctx, R.drawable.ic_baseline_search_24, theme).apply {
+        contentDescription = ctx.getString(R.string.clipboard_search)
+    }
+
     val extension = horizontalLayout {
+        add(searchButton, lParams(dp(40), dp(40)))
         add(deleteAllButton, lParams(dp(40), dp(40)))
+    }
+
+    fun setSearchMode(on: Boolean) {
+        searching = on
+        tabsUi.root.visibility = if (on) View.GONE else View.VISIBLE
+        searchBar.visibility = if (on) View.VISIBLE else View.GONE
+        searchKeyboard.visibility = if (on) View.VISIBLE else View.GONE
+    }
+
+    fun updateSearchQuery(query: String) {
+        searchBar.text = query.ifEmpty { ctx.getString(R.string.clipboard_search) }
     }
 
     private fun setDeleteButtonShown(enabled: Boolean) {
@@ -75,6 +111,7 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
     }
 
     private fun setTabsShown(shown: Boolean) {
+        if (searching) return
         tabsUi.root.visibility = if (shown) View.VISIBLE else View.GONE
     }
 
