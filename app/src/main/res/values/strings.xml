@@ -61,6 +61,9 @@
     <string name="unpin">Unpin</string>
     <string name="delete">Delete</string>
     <string name="clipboard">Clipboard</string>
+    <string name="handwriting">Handwriting</string>
+    <string name="handwriting_clear">Clear strokes</string>
+    <string name="handwriting_model_missing">Handwriting model not installed. Put handwriting-zh_CN.model under app/src/main/assets/handwriting/ and rebuild.</string>
     <string name="clipboard_tab_recent">Recent</string>
     <string name="clipboard_tab_pinned">Pinned</string>
     <string name="clipboard_search">Search clipboard</string>

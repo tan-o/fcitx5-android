@@ -61,6 +61,9 @@
     <string name="unpin">取消置顶</string>
     <string name="delete">删除</string>
     <string name="clipboard">剪贴板</string>
+    <string name="handwriting">手写</string>
+    <string name="handwriting_clear">清除笔迹</string>
+    <string name="handwriting_model_missing">未安装手写模型。请把 handwriting-zh_CN.model 放到 app/src/main/assets/handwriting/ 后重新编译。</string>
     <string name="clipboard_tab_recent">最近</string>
     <string name="clipboard_tab_pinned">已固定</string>
     <string name="clipboard_search">搜索剪贴板</string>
