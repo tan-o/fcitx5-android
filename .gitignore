@@ -102,3 +102,6 @@ lint/tmp/
 
 ### Kotlin ###
 .kotlin/
+
+# Downloaded and verified during the build.
+app/src/main/assets/usr/share/rime-data/*.gram

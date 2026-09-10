@@ -34,6 +34,10 @@ android {
         }
     }
 
+    compileOptions { isCoreLibraryDesugaringEnabled = true }
+
+    packaging.resources.excludes += setOf("META-INF/DEPENDENCIES", "META-INF/LICENSE", "META-INF/NOTICE")
+
     buildFeatures {
         viewBinding = true
         resValues = true
@@ -82,6 +86,9 @@ ksp {
 }
 
 dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
+    implementation("org.eclipse.jgit:org.eclipse.jgit:7.8.0.202609011348-r")
+    implementation("org.yaml:snakeyaml:2.4")
     ksp(project(":codegen"))
     implementation(project(":lib:fcitx5"))
     implementation(project(":lib:fcitx5-lua"))
@@ -143,5 +150,14 @@ configurations {
         // remove unwanted splitties libraries...
         exclude(group = "com.louiscad.splitties", module = "splitties-appctx")
         exclude(group = "com.louiscad.splitties", module = "splitties-systemservices")
+    }
+}
+
+// The model is part of this build, not a first-run download.
+tasks.named("generateDataDescriptor") {
+    doFirst {
+        check(file("src/main/assets/usr/share/rime-data/wanxiang-lts-zh-hans.gram").isFile) {
+            "Run python3 scripts/fetch-wanxiang-model.py before building"
+        }
     }
 }

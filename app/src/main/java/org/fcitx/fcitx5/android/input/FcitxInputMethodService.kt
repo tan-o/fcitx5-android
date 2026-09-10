@@ -229,6 +229,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         lastKnownConfig = resources.configuration
     }
 
+    val editingHistory by lazy { org.fcitx.fcitx5.android.input.history.EditingHistory(this) }
+
     var keyboardTextTarget: org.fcitx.fcitx5.android.input.translation.KeyboardTextTarget? = null
 
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
@@ -425,6 +427,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     fun commitText(text: String, cursor: Int = -1) {
         keyboardTextTarget?.let { it.commit(text); return }
+        editingHistory.capture()
         val ic = currentInputConnection ?: return
         // when composing text equals commit content, finish composing text as-is
         if (composing.isNotEmpty() && composingText.toString() == text) {
@@ -738,6 +741,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         resetComposingState()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         capabilityFlags = flags
+        editingHistory.reset(!flags.has(org.fcitx.fcitx5.android.core.CapabilityFlag.Password) && attribute.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING == 0)
+        editingHistory.capture()
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
@@ -801,6 +806,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             cursorUpdateIndex
         )
         inputView?.updateSelection(newSelStart, newSelEnd)
+        if (candidatesStart < 0) editingHistory.capture()
     }
 
     private val contentSize = floatArrayOf(0f, 0f)
@@ -1070,6 +1076,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInput() {
         keyboardTextTarget = null
+        editingHistory.reset(false)
         Timber.d("onFinishInput")
         postFcitxJob {
             focus(false)

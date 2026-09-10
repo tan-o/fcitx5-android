@@ -37,6 +37,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y extra-cmake-modules gettext
+      - name: Fetch pinned Wanxiang language model
+        run: python3 scripts/fetch-wanxiang-model.py
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
       - name: Test and build app with embedded Rime

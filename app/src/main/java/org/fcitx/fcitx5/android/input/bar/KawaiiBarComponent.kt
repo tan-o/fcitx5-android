@@ -105,7 +105,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val expandToolbarByDefault by prefs.keyboard.expandToolbarByDefault
     private val toolbarNumRowOnPassword by prefs.keyboard.toolbarNumRowOnPassword
     private val showVoiceInputButton by prefs.keyboard.showVoiceInputButton
-    private val preferredVoiceInput by prefs.keyboard.preferredVoiceInput
 
     private var clipboardTimeoutJob: Job? = null
 
@@ -255,11 +254,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         } else false
     }
 
-    private var voiceInputTarget: Pair<String, InputMethodSubtype?>? = null
-
     private val switchToVoiceInputCallback = View.OnClickListener {
-        val (id, subtype) = voiceInputTarget ?: return@OnClickListener
-        InputMethodUtil.switchInputMethod(service, id, subtype)
+        windowManager.attachWindow(org.fcitx.fcitx5.android.input.voice.VoiceWindow())
     }
 
     private val idleUi: IdleUi by lazy {
@@ -295,6 +291,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 undoButton.setOnClickListener {
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
                 }
+                undoButton.setOnLongClickListener { service.editingHistory.show(); true }
+                redoButton.setOnLongClickListener { service.editingHistory.show(); true }
                 redoButton.setOnClickListener {
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true)
                 }
@@ -449,9 +447,8 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             idleUi.inlineSuggestionsBar.clear()
         }
-        voiceInputTarget = InputMethodUtil.findSwitchTarget(preferredVoiceInput)
         val shouldShowVoiceInput =
-            showVoiceInputButton && voiceInputTarget != null && !capFlags.has(CapabilityFlag.Password)
+            showVoiceInputButton && !capFlags.has(CapabilityFlag.Password)
         idleUi.setHideKeyboardIsVoiceInput(
             shouldShowVoiceInput,
             if (shouldShowVoiceInput) switchToVoiceInputCallback else hideKeyboardCallback

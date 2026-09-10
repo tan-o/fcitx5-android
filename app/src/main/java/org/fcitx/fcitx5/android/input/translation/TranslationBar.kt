@@ -19,7 +19,7 @@ import org.fcitx.fcitx5.android.ui.main.settings.SettingsRoute
 import org.fcitx.fcitx5.android.utils.AppUtil
 import splitties.dimensions.dp
 
-class TranslationBar(private val service: FcitxInputMethodService, theme: Theme) {
+class TranslationBar(private val service: FcitxInputMethodService, private val theme: Theme) {
     private var task: Job? = null
     private var balanceJob: Job? = null
     private var target: KeyboardTextTarget? = null
@@ -68,7 +68,7 @@ class TranslationBar(private val service: FcitxInputMethodService, theme: Theme)
     fun toggle() {
         if (root.visibility == View.VISIBLE) { close(); return }
         if (!DeepSeek.configured) {
-            AppUtil.launchMain(service)
+            AppUtil.launchMainToTranslation(service)
             Toast.makeText(service, "请在设置中的 DeepSeek 翻译配置 API Key 和模型", Toast.LENGTH_LONG).show()
             return
         }
@@ -111,6 +111,7 @@ class TranslationBar(private val service: FcitxInputMethodService, theme: Theme)
         }
     }
     fun close() {
+        if (root.visibility != View.VISIBLE && target == null) return
         task?.cancel()
         balanceJob?.cancel()
         root.visibility = View.GONE

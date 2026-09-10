@@ -67,6 +67,9 @@ class MainFragment : PaddingPreferenceFragment() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         preferenceScreen = preferenceManager.createPreferenceScreen(requireContext()).apply {
             addCategory("Fcitx") {
+                addPreference("Rime", "方案仓库、自定义补丁与万象模型", R.drawable.ic_baseline_language_24) {
+                    navigateWithAnim(SettingsRoute.Rime)
+                }
                 addDestinationPreference(
                     R.string.global_options,
                     R.drawable.ic_baseline_tune_24,
@@ -84,6 +87,9 @@ class MainFragment : PaddingPreferenceFragment() {
                 )
             }
             addCategory("Android") {
+                addPreference("Samsung 与系统语音", icon = R.drawable.ic_baseline_settings_24) {
+                    navigateWithAnim(SettingsRoute.Voice)
+                }
                 addPreference("DeepSeek 翻译", icon = R.drawable.ic_baseline_language_24) {
                     navigateWithAnim(SettingsRoute.DeepSeekTranslation)
                 }
