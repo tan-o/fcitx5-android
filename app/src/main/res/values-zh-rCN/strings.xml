@@ -331,9 +331,7 @@
     <string name="display_metrics">显示指标 (Resources.getDisplayMetrics)</string>
     <string name="real_size">真实尺寸 (Display.getRealSize)</string>
     <string name="handwriting_model_checking">正在检查手写模型…</string>
-    <string name="handwriting_model_download">点击下载中文手写模型，下载后可离线使用</string>
-    <string name="handwriting_model_downloading">正在下载手写模型…</string>
-    <string name="handwriting_model_retry">下载失败，请确认网络可访问 Google，点击重试</string>
+    <string name="handwriting_model_retry">内置手写模型加载失败，点击重试</string>
     <string name="handwriting_hint">在下方手写，点击候选即可输入</string>
     <string name="handwriting_recognition_retry">识别失败，请继续写一笔或清空重试</string>
     <string name="handwriting_undo">撤销一笔／退格</string>

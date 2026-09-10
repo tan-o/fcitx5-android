@@ -331,9 +331,7 @@
     <string name="display_metrics">Display metrics (Resources.getDisplayMetrics)</string>
     <string name="real_size">Real size (Display.getRealSize)</string>
     <string name="handwriting_model_checking">Checking handwriting model…</string>
-    <string name="handwriting_model_download">Tap to download Chinese handwriting model. Recognition then works offline.</string>
-    <string name="handwriting_model_downloading">Downloading model…</string>
-    <string name="handwriting_model_retry">Download failed. Check access to Google, then tap to retry.</string>
+    <string name="handwriting_model_retry">Bundled handwriting model could not be loaded. Tap to retry.</string>
     <string name="handwriting_hint">Write here; tap a candidate to insert it</string>
     <string name="handwriting_recognition_retry">Recognition failed. Add a stroke or clear and retry.</string>
     <string name="handwriting_undo">Undo stroke / backspace</string>

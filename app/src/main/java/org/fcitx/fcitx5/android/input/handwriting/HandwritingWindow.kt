@@ -70,22 +70,14 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
         }
     }
 
-    private fun prepareModel(download: Boolean) {
+    private fun prepareModel() {
         if (modelJob?.isActive == true) return
         status.setText(R.string.handwriting_model_checking)
         status.setOnClickListener(null)
         modelJob = service.lifecycleScope.launch {
             try {
                 val engine = recognizer ?: HandwritingRecognizer().also { recognizer = it }
-                if (!engine.isReady()) {
-                    if (!download) {
-                        status.setText(R.string.handwriting_model_download)
-                        status.setOnClickListener { prepareModel(true) }
-                        return@launch
-                    }
-                    status.setText(R.string.handwriting_model_downloading)
-                    engine.download()
-                }
+                if (!engine.isReady() || !attached) return@launch
                 ready = true
                 canvas.isEnabled = true
                 status.setText(R.string.handwriting_hint)
@@ -96,7 +88,7 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
             } catch (e: Exception) {
                 Timber.w(e, "Handwriting model unavailable")
                 status.setText(R.string.handwriting_model_retry)
-                status.setOnClickListener { prepareModel(true) }
+                status.setOnClickListener { prepareModel() }
             }
         }
     }
@@ -154,7 +146,7 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
         attached = true
         ready = false
         canvas.isEnabled = false
-        prepareModel(false)
+        prepareModel()
     }
 
     override fun onDetached() {

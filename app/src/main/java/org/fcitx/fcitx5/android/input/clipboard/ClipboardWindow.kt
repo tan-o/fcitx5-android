@@ -141,7 +141,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
         }
     }
 
-    private val searchKeyActionListener = KeyActionListener { action, _ ->
+    private val searchKeyActionListener: KeyActionListener = KeyActionListener { action, _ ->
         when (action) {
             is KeyAction.FcitxKeyAction -> updateSearchQuery(searchQuery + action.act)
             is KeyAction.CommitAction -> updateSearchQuery(searchQuery + action.text)
@@ -227,7 +227,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
         }
     }
 
-    private val ui by lazy {
+    private val ui: ClipboardUi by lazy {
         ClipboardUi(context, theme).apply {
             recyclerView.apply {
                 layoutManager = StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)

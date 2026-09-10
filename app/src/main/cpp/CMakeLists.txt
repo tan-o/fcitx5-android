@@ -44,9 +44,23 @@ add_library(pinyin-customphrase STATIC "${CHINESE_ADDONS_PINYIN_DIR}/customphras
 target_include_directories(pinyin-customphrase INTERFACE "${CHINESE_ADDONS_PINYIN_DIR}")
 target_link_libraries(pinyin-customphrase PRIVATE Fcitx5::Utils LibIME::Core)
 
-add_library(native-lib SHARED native-lib.cpp androidaddonloader/androidaddonloader.cpp)
+# handwriting recognition (BSD licensed, vendored under zinnia/)
+add_library(zinnia STATIC
+        zinnia/character.cpp
+        zinnia/feature.cpp
+        zinnia/libzinnia.cpp
+        zinnia/param.cpp
+        zinnia/recognizer.cpp
+        zinnia/sexp.cpp
+        zinnia/svm.cpp
+        zinnia/trainer.cpp)
+target_compile_definitions(zinnia PRIVATE HAVE_CONFIG_H)
+target_include_directories(zinnia PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/zinnia")
+
+add_library(native-lib SHARED native-lib.cpp androidaddonloader/androidaddonloader.cpp handwriting/handwriting.cpp)
 target_link_libraries(native-lib
         log
+        zinnia
         libuv::uv_a
         Fcitx5::Utils
         Fcitx5::Config

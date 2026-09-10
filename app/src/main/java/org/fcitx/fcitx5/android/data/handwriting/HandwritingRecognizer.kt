@@ -4,59 +4,72 @@
  */
 package org.fcitx.fcitx5.android.data.handwriting
 
-import com.google.android.gms.tasks.Task
-import com.google.mlkit.common.model.DownloadConditions
-import com.google.mlkit.common.model.RemoteModelManager
-import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognition
-import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModel
-import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModelIdentifier
-import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognizerOptions
-import com.google.mlkit.vision.digitalink.recognition.Ink
-import com.google.mlkit.vision.digitalink.recognition.RecognitionContext
-import com.google.mlkit.vision.digitalink.recognition.WritingArea
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.utils.appContext
+import java.io.File
 
-/** One recognizer per handwriting window; recognition stays on device. */
+/** Local Zinnia recognition with a bundled model; no network or telemetry SDK. */
 class HandwritingRecognizer : AutoCloseable {
     data class Point(val x: Float, val y: Float, val time: Long)
+    private var handle = 0L
+    private var closed = false
 
-    private val model = DigitalInkRecognitionModel.builder(
-        checkNotNull(DigitalInkRecognitionModelIdentifier.fromLanguageTag("zh-Hans"))
-    ).build()
-    private val modelManager = RemoteModelManager.getInstance()
-    private val client = DigitalInkRecognition.getClient(
-        DigitalInkRecognizerOptions.builder(model).build()
-    )
+    init { System.loadLibrary("native-lib") }
 
-    suspend fun isReady(): Boolean = modelManager.isModelDownloaded(model).awaitResult()
-
-    suspend fun download() {
-        modelManager.download(model, DownloadConditions.Builder().build()).awaitResult()
-    }
-
-    suspend fun classify(width: Int, height: Int, strokes: List<List<Point>>): List<String> {
-        if (width <= 0 || height <= 0 || strokes.isEmpty()) return emptyList()
-        val ink = Ink.builder().apply {
-            strokes.filter { it.isNotEmpty() }.forEach { points ->
-                addStroke(Ink.Stroke.builder().apply {
-                    points.forEach { addPoint(Ink.Point.create(it.x, it.y, it.time)) }
-                }.build())
+    suspend fun isReady(): Boolean = withContext(Dispatchers.IO) {
+        synchronized(this@HandwritingRecognizer) {
+            if (closed) return@synchronized false
+            if (handle != 0L) return@synchronized true
+            val model = File(appContext.noBackupFilesDir, "handwriting-zh_CN.model")
+            if (!model.isFile) {
+                val temporary = File.createTempFile("handwriting-", ".tmp", appContext.noBackupFilesDir)
+                try {
+                    appContext.assets.open("handwriting/handwriting-zh_CN.model").use { input ->
+                        temporary.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    check(temporary.renameTo(model)) { "Cannot install bundled handwriting model" }
+                } finally {
+                    temporary.delete()
+                }
             }
-        }.build()
-        val context = RecognitionContext.builder()
-            .setWritingArea(WritingArea(width.toFloat(), height.toFloat()))
-            .build()
-        return client.recognize(ink, context).awaitResult().candidates
-            .map { it.text }.filter { it.isNotBlank() }.distinct().take(10)
+            handle = nativeOpen(model.absolutePath)
+            check(handle != 0L) { "Cannot open bundled handwriting model" }
+            true
+        }
     }
 
-    override fun close() = client.close()
+    suspend fun classify(width: Int, height: Int, strokes: List<List<Point>>): List<String> =
+        withContext(Dispatchers.Default) {
+            synchronized(this@HandwritingRecognizer) {
+                if (closed || handle == 0L || width <= 0 || height <= 0 || strokes.isEmpty()) {
+                    return@synchronized emptyList()
+                }
+                val nonEmpty = strokes.filter { it.isNotEmpty() }
+                val flat = ArrayList<Int>()
+                flat.add(nonEmpty.size)
+                nonEmpty.forEach { stroke ->
+                    flat.add(stroke.size)
+                    stroke.forEach { point ->
+                        flat.add(point.x.toInt().coerceIn(0, width))
+                        flat.add(point.y.toInt().coerceIn(0, height))
+                    }
+                }
+                nativeClassify(handle, width, height, flat.toIntArray(), 10)
+                    ?.filter { it.isNotBlank() }?.distinct().orEmpty()
+            }
+        }
 
-    private suspend fun <T> Task<T>.awaitResult(): T = suspendCancellableCoroutine { continuation ->
-        addOnSuccessListener { if (continuation.isActive) continuation.resume(it) }
-        addOnFailureListener { if (continuation.isActive) continuation.resumeWithException(it) }
-        addOnCanceledListener { continuation.cancel() }
+    @Synchronized
+    override fun close() {
+        closed = true
+        if (handle != 0L) nativeClose(handle)
+        handle = 0L
     }
+
+    private external fun nativeOpen(model: String): Long
+    private external fun nativeClose(handle: Long)
+    private external fun nativeClassify(
+        handle: Long, width: Int, height: Int, strokes: IntArray, nbest: Int
+    ): Array<String>?
 }
