@@ -97,8 +97,8 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     private var filterJob: Job? = null
 
-    private fun cycleFilterMode() {
-        filterMode = filterMode.next()
+    private fun selectFilterMode(selected: CandidateFilterMode) {
+        filterMode = selected
         val mode = filterMode
         val generation = adapter.generation
         candidateLayout.filterUi.setMode(mode)
@@ -117,6 +117,14 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
                 if (filterMode != mode || adapter.generation != generation) return@launch
                 allCandidates = snapshot
                 candidateLayout.filterUi.setChips(chips)
+                if (mode == CandidateFilterMode.Single) {
+                    candidatesSubmitJob?.cancel()
+                    candidatesSubmitJob = service.lifecycleScope.launch {
+                        adapter.submitData(PagingData.from(snapshot.filter {
+                            it.candidate.text.codePointCount(0, it.candidate.text.length) == 1
+                        }))
+                    }
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -128,32 +136,35 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
 
     private fun chipsOf(candidates: List<IndexedCandidate>, mode: CandidateFilterMode): List<String> =
         when (mode) {
-            CandidateFilterMode.Radical -> candidates
+            CandidateFilterMode.Single -> candidates
+                .filter { it.candidate.text.codePointCount(0, it.candidate.text.length) == 1 }
                 .mapNotNull { HanziIndex.of(it.candidate.text)?.radical }
-                .distinct()
-                .sortedWith(compareBy({ HanziIndex.radicalStrokes(it) }, { it }))
-            CandidateFilterMode.Strokes -> candidates
-                .mapNotNull { HanziIndex.of(it.candidate.text)?.strokes }
-                .distinct().sorted().map { it.toString() }
+                .distinct().sortedWith(compareBy({ HanziIndex.radicalStrokes(it) }, { it }))
             CandidateFilterMode.None -> emptyList()
         }
 
     private fun keyOf(candidate: CandidateWord): String? {
         val entry = HanziIndex.of(candidate.text) ?: return null
         return when (filterMode) {
-            CandidateFilterMode.Radical -> entry.radical
-            CandidateFilterMode.Strokes -> entry.strokes.toString()
+            CandidateFilterMode.Single -> entry.radical
             CandidateFilterMode.None -> null
         }
     }
 
     private fun applyFilter(chip: String?) {
         if (chip == null) {
-            clearFilter()
+            if (filterMode == CandidateFilterMode.None) clearFilter()
+            else submitSingleCandidates(null)
             return
         }
+        submitSingleCandidates(chip)
+    }
+
+    private fun submitSingleCandidates(chip: String?) {
         val matched = allCandidates.filter {
-            it.generation == adapter.generation && keyOf(it.candidate) == chip
+            it.generation == adapter.generation &&
+                it.candidate.text.codePointCount(0, it.candidate.text.length) == 1 &&
+                (chip == null || keyOf(it.candidate) == chip)
         }
         candidatesSubmitJob?.cancel()
         candidateLayout.resetPosition()
@@ -193,7 +204,7 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
         candidateLayout = onCreateCandidateLayout().apply {
             filterUi.apply {
                 setMode(filterMode)
-                onModeClick = { cycleFilterMode() }
+                onModeSelected = { selectFilterMode(it) }
                 onChipClick = { applyFilter(it) }
             }
             scrollableTabs.apply {

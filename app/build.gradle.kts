@@ -27,7 +27,8 @@ android {
                     // android specific modules
                     "androidfrontend",
                     "androidkeyboard",
-                    "androidnotification"
+                    "androidnotification",
+                    "rime"
                 )
             }
         }
@@ -70,6 +71,10 @@ fcitxComponent {
         "usr/share/fcitx5/inputmethod/$it.conf"
     }
     installPrebuiltAssets = true
+}
+
+generateDataDescriptor {
+    symlinks.put("usr/share/rime-data/opencc", "usr/share/opencc")
 }
 
 ksp {

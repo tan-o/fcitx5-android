@@ -46,16 +46,28 @@ class HandwritingRecognizer : AutoCloseable {
                     return@synchronized emptyList()
                 }
                 val nonEmpty = strokes.filter { it.isNotEmpty() }
+                if (nonEmpty.isEmpty()) return@synchronized emptyList()
+                val points = nonEmpty.flatten()
+                val left = points.minOf { it.x }
+                val top = points.minOf { it.y }
+                val right = points.maxOf { it.x }
+                val bottom = points.maxOf { it.y }
+                // Zinnia expects a square character. The keyboard canvas is wide;
+                // scaling by its dimensions distorts every character differently.
+                val side = maxOf(right - left, bottom - top, 1f)
+                val scale = 800f / side
+                val centerX = (left + right) / 2f
+                val centerY = (top + bottom) / 2f
                 val flat = ArrayList<Int>()
                 flat.add(nonEmpty.size)
                 nonEmpty.forEach { stroke ->
                     flat.add(stroke.size)
                     stroke.forEach { point ->
-                        flat.add(point.x.toInt().coerceIn(0, width))
-                        flat.add(point.y.toInt().coerceIn(0, height))
+                        flat.add(((point.x - centerX) * scale + 500f).toInt())
+                        flat.add(((point.y - centerY) * scale + 500f).toInt())
                     }
                 }
-                nativeClassify(handle, width, height, flat.toIntArray(), 10)
+                nativeClassify(handle, 1000, 1000, flat.toIntArray(), 20)
                     ?.filter { it.isNotBlank() }?.distinct().orEmpty()
             }
         }

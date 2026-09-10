@@ -7,7 +7,7 @@ package org.fcitx.fcitx5.android.data.handwriting
 import org.fcitx.fcitx5.android.utils.appContext
 
 /**
- * Most common reading of each of the 8105 chars of 通用规范汉字表, used to
+ * All recorded readings of each of the 8105 chars of 通用规范汉字表, used to
  * annotate handwriting candidates. Data from mozillazg/pinyin-data.
  */
 object HandwritingPinyin {
@@ -38,6 +38,6 @@ object HandwritingPinyin {
 
     fun of(char: String): String? {
         if (char.isEmpty()) return null
-        return table[char.codePointAt(0)]
+        return table[char.codePointAt(0)]?.substringBefore(',')
     }
 }

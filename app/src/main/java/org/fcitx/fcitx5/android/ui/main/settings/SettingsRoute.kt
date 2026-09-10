@@ -87,6 +87,9 @@ sealed class SettingsRoute : Parcelable {
     data object Advanced : SettingsRoute()
 
     @Serializable
+    data object DeepSeekTranslation : SettingsRoute()
+
+    @Serializable
     data object Developer : SettingsRoute()
 
     @Serializable
@@ -186,6 +189,7 @@ sealed class SettingsRoute : Parcelable {
 
             /* ========== Index ========== */
 
+            fragment<DeepSeekSettingsFragment, DeepSeekTranslation> { label = "DeepSeek 翻译" }
             fragment<MainFragment, Index> {
                 label = ctx.getString(R.string.app_name)
             }

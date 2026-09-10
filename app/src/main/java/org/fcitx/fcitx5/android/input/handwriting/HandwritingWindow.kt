@@ -113,20 +113,33 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
                 }
                 if (token != generation || !attached) return@launch
                 annotated.forEach { (text, pinyin) ->
-                    candidates.addView(TextView(context).apply {
-                        this.text = if (pinyin.isEmpty()) text else "$text\n$pinyin"
-                        textSize = 18f
-                        gravity = Gravity.CENTER
-                        setTextColor(theme.candidateTextColor)
-                        setPadding(context.dp(14), 0, context.dp(14), 0)
-                        layoutParams = LinearLayout.LayoutParams(-2, -1)
+                    val item = LinearLayout(context).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.BOTTOM
+                        setPadding(context.dp(10), 0, context.dp(10), context.dp(3))
+                        contentDescription = "$text $pinyin"
+                        addView(TextView(context).apply {
+                            this.text = text
+                            textSize = 24f
+                            gravity = Gravity.CENTER
+                            includeFontPadding = false
+                            setTextColor(theme.candidateTextColor)
+                        }, LinearLayout.LayoutParams(-2, -1))
+                        addView(TextView(context).apply {
+                            this.text = pinyin.replace(',', ' ')
+                            textSize = 10f
+                            includeFontPadding = false
+                            setPadding(context.dp(3), 0, 0, 0)
+                            setTextColor(theme.candidateTextColor)
+                        }, LinearLayout.LayoutParams(-2, -2))
                         setOnClickListener {
                             if (token == generation && attached) {
                                 service.commitText(text)
                                 reset()
                             }
                         }
-                    })
+                    }
+                    candidates.addView(item, LinearLayout.LayoutParams(-2, -1))
                 }
             } catch (e: CancellationException) {
                 throw e

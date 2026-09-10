@@ -307,6 +307,10 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 handwritingButton.setOnClickListener {
                     windowManager.attachWindow(HandwritingWindow())
                 }
+                translationButton.setOnClickListener {
+                    windowManager.attachWindow(KeyboardWindow)
+                    (windowManager.getEssentialWindow(KeyboardWindow) as KeyboardWindow).toggleTranslation()
+                }
                 moreButton.setOnClickListener {
                     windowManager.attachWindow(StatusAreaWindow())
                 }

@@ -229,7 +229,10 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         lastKnownConfig = resources.configuration
     }
 
+    var keyboardTextTarget: org.fcitx.fcitx5.android.input.translation.KeyboardTextTarget? = null
+
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
+        if (keyboardTextTarget?.consume(event) == true) return
         when (event) {
             is FcitxEvent.CommitStringEvent -> {
                 commitText(event.data.text, event.data.cursor)
@@ -421,6 +424,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     fun commitText(text: String, cursor: Int = -1) {
+        keyboardTextTarget?.let { it.commit(text); return }
         val ic = currentInputConnection ?: return
         // when composing text equals commit content, finish composing text as-is
         if (composing.isNotEmpty() && composingText.toString() == text) {
@@ -725,6 +729,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        keyboardTextTarget = null
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
         // initialSel{Start,End} is outdated. but it's the client app's responsibility to send
@@ -1064,6 +1069,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onFinishInput() {
+        keyboardTextTarget = null
         Timber.d("onFinishInput")
         postFcitxJob {
             focus(false)

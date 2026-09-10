@@ -151,16 +151,21 @@ class ExpandedCandidateLayout(context: Context, theme: Theme) : ConstraintLayout
                 centerHorizontally()
             })
         }
-        add(filterUi.root, lParams(height = dp(34)) {
+        add(filterUi.modes, lParams(height = dp(40)) {
             topOfParent()
             leftToRightOf(tabsContainer)
             rightToLeftOf(embeddedKeyboard)
         })
-        add(recyclerView, lParams {
-            below(filterUi.root)
+        add(filterUi.root, lParams(height = dp(44)) {
+            bottomOfParent()
             leftToRightOf(tabsContainer)
             rightToLeftOf(embeddedKeyboard)
-            bottomOfParent()
+        })
+        add(recyclerView, lParams {
+            below(filterUi.modes)
+            leftToRightOf(tabsContainer)
+            rightToLeftOf(embeddedKeyboard)
+            above(filterUi.root)
         })
         add(embeddedKeyboard, lParams {
             matchConstraintPercentWidth = 0.15f

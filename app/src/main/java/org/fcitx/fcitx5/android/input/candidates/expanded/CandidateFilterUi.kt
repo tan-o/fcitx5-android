@@ -28,21 +28,16 @@ import splitties.views.dsl.core.Ui
  */
 enum class CandidateFilterMode {
     None,
-    Radical,
-    Strokes;
+    Single;
 
     val labelRes: Int
         get() = when (this) {
             None -> R.string.candidate_filter_none
-            Radical -> R.string.candidate_filter_radical
-            Strokes -> R.string.candidate_filter_strokes
+            Single -> R.string.candidate_filter_single
+
         }
 
-    fun next(): CandidateFilterMode = when (this) {
-        None -> Radical
-        Radical -> Strokes
-        Strokes -> None
-    }
+
 }
 
 /**
@@ -51,16 +46,23 @@ enum class CandidateFilterMode {
  */
 class CandidateFilterUi(override val ctx: Context, private val theme: Theme) : Ui {
 
-    var onModeClick: (() -> Unit)? = null
 
     /** null means "clear the filter". */
     var onChipClick: ((String?) -> Unit)? = null
 
     private var activeChip: String? = null
 
-    private val modeButton = chipView().apply {
-        setTextColor(theme.altKeyTextColor)
-        setOnClickListener { onModeClick?.invoke() }
+    var onModeSelected: ((CandidateFilterMode) -> Unit)? = null
+    private val modeButtons = CandidateFilterMode.entries.associateWith { mode ->
+        chipView().apply {
+            setText(mode.labelRes)
+            setTextColor(theme.candidateTextColor)
+            setOnClickListener { onModeSelected?.invoke(mode) }
+        }
+    }
+    val modes = LinearLayout(ctx).apply {
+        id = View.generateViewId()
+        modeButtons.values.forEach { addView(it, LinearLayout.LayoutParams(0, -1, 1f)) }
     }
 
     private val chipsLayout = LinearLayout(ctx).apply {
@@ -82,21 +84,14 @@ class CandidateFilterUi(override val ctx: Context, private val theme: Theme) : U
         id = View.generateViewId()
         orientation = LinearLayout.HORIZONTAL
         addView(
-            modeButton,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-        )
-        addView(
             chipsScroll,
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
         )
     }
 
     fun setMode(mode: CandidateFilterMode) {
-        modeButton.setText(mode.labelRes)
-        modeButton.isActivated = mode != CandidateFilterMode.None
+        modeButtons.forEach { (key, button) -> button.isActivated = key == mode }
+        root.visibility = if (mode == CandidateFilterMode.None) View.GONE else View.VISIBLE
     }
 
     fun setChips(chips: List<String>) {

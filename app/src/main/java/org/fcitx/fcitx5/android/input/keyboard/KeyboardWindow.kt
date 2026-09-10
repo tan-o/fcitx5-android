@@ -63,6 +63,10 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             nextWindow !is PickerWindow
         }
 
+    private val translation by lazy { org.fcitx.fcitx5.android.input.translation.TranslationBar(service, theme) }
+
+    fun toggleTranslation() = translation.toggle()
+
     private lateinit var keyboardView: FrameLayout
 
     private val keyboards: HashMap<String, BaseKeyboard> by lazy {
@@ -92,7 +96,11 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     override fun onCreateView(): View {
         keyboardView = context.frameLayout(R.id.keyboard_view)
         attachLayout(TextKeyboard.Name)
-        return keyboardView
+        return android.widget.LinearLayout(context).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            addView(translation.root, android.widget.LinearLayout.LayoutParams(-1, context.resources.displayMetrics.density.times(48).toInt()))
+            addView(keyboardView, android.widget.LinearLayout.LayoutParams(-1, 0, 1f))
+        }
     }
 
     private fun detachCurrentLayout() {
@@ -139,6 +147,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     }
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
+        translation.close()
         val targetLayout = when (info.inputType and InputType.TYPE_MASK_CLASS) {
             InputType.TYPE_CLASS_NUMBER -> NumberKeyboard.Name
             InputType.TYPE_CLASS_PHONE -> NumberKeyboard.Name

@@ -39,14 +39,12 @@ jobs:
           sudo apt-get install -y extra-cmake-modules gettext
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
-      # Both APKs share this runner's debug keystore for signature-level plugin access.
-      - name: Test and build app and Rime
-        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug :plugin:rime:assembleDebug --stacktrace
+      - name: Test and build app with embedded Rime
+        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
       - name: Collect APKs
         run: |
           mkdir -p apks
           cp app/build/outputs/apk/debug/*.apk apks/
-          cp plugin/rime/build/outputs/apk/debug/*.apk apks/
           sha256sum apks/*.apk > apks/SHA256SUMS.txt
       - name: Upload APKs
         uses: actions/upload-artifact@v7
