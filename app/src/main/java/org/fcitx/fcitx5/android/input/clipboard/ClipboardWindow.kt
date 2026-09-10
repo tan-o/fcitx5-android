@@ -169,8 +169,8 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     }
 
     private val loadStateListener: (CombinedLoadStates) -> Unit = {
-        if (!inSearchMode) {
-            val empty = it.append.endOfPaginationReached && adapter.itemCount < 1
+        if (!inSearchMode && it.refresh is androidx.paging.LoadState.NotLoading) {
+            val empty = adapter.itemCount == 0
             stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to empty)
         }
     }
@@ -230,6 +230,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     private val ui: ClipboardUi by lazy {
         ClipboardUi(context, theme).apply {
             recyclerView.apply {
+                itemAnimator = null
                 layoutManager = StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
                 adapter = this@ClipboardWindow.adapter
             }

@@ -24,12 +24,17 @@ import org.fcitx.fcitx5.android.data.handwriting.HandwritingRecognizer.Point
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
+import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
+import org.fcitx.fcitx5.android.input.wm.InputWindowManager
+import org.mechdancer.dependency.manager.must
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
 import timber.log.Timber
 
 class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
+    private val windowManager: InputWindowManager by manager.must()
+    override val showTitle = false
     private val service by manager.inputMethodService()
     private val theme by manager.theme()
     private var recognizer: HandwritingRecognizer? = null
@@ -62,16 +67,13 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
             orientation = LinearLayout.VERTICAL
             backgroundColor = theme.keyboardColor
             addView(status, LinearLayout.LayoutParams(-1, context.dp(40)))
-            addView(HorizontalScrollView(context).apply {
-                isHorizontalScrollBarEnabled = false
-                addView(candidates, ViewGroup.LayoutParams(-2, -1))
-            }, LinearLayout.LayoutParams(-1, context.dp(52)))
             addView(canvas, LinearLayout.LayoutParams(-1, 0, 1f))
         }
     }
 
     private fun prepareModel() {
         if (modelJob?.isActive == true) return
+        status.visibility = View.VISIBLE
         status.setText(R.string.handwriting_model_checking)
         status.setOnClickListener(null)
         modelJob = service.lifecycleScope.launch {
@@ -80,13 +82,14 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
                 if (!engine.isReady() || !attached) return@launch
                 ready = true
                 canvas.isEnabled = true
-                status.setText(R.string.handwriting_hint)
+                status.visibility = View.GONE
                 status.setOnClickListener(null)
                 classify(canvas.snapshot())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.w(e, "Handwriting model unavailable")
+                status.visibility = View.VISIBLE
                 status.setText(R.string.handwriting_model_retry)
                 status.setOnClickListener { prepareModel() }
             }
@@ -129,7 +132,10 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
                 throw e
             } catch (e: Exception) {
                 Timber.w(e, "Handwriting recognition failed")
-                if (token == generation) status.setText(R.string.handwriting_recognition_retry)
+                if (token == generation) {
+                    status.visibility = View.VISIBLE
+                    status.setText(R.string.handwriting_recognition_retry)
+                }
             }
         }
     }
@@ -139,7 +145,7 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
         classifyJob?.cancel()
         canvas.clear()
         candidates.removeAllViews()
-        if (ready) status.setText(R.string.handwriting_hint)
+        if (ready) status.visibility = View.GONE
     }
 
     override fun onAttached() {
@@ -154,8 +160,9 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
         reset()
         modelJob?.cancel()
         modelJob = null
-        recognizer?.close()
+        val closing = recognizer
         recognizer = null
+        service.lifecycleScope.launch(Dispatchers.IO) { closing?.close() }
         ready = false
     }
 
@@ -163,6 +170,14 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
 
     override fun onCreateBarExtension(): View = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
+        addView(ToolButton(context, R.drawable.ic_baseline_arrow_back_24, theme).apply {
+            contentDescription = context.getString(R.string.back_to_keyboard)
+            setOnClickListener { windowManager.attachWindow(KeyboardWindow) }
+        }, LinearLayout.LayoutParams(context.dp(40), context.dp(40)))
+        addView(HorizontalScrollView(context).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(candidates, ViewGroup.LayoutParams(-2, -1))
+        }, LinearLayout.LayoutParams(0, -1, 1f))
         addView(ToolButton(context, R.drawable.ic_baseline_backspace_24, theme).apply {
             contentDescription = context.getString(R.string.handwriting_undo)
             setOnClickListener {

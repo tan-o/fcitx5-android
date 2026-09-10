@@ -10,8 +10,6 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.FrameLayout
 import android.widget.ViewAnimator
-import androidx.transition.Fade
-import androidx.transition.TransitionManager
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
@@ -98,7 +96,6 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
     private var searching = false
 
     private val keyBorder by ThemeManager.prefs.keyBorder
-    private val disableAnimation by AppPrefs.getInstance().advanced.disableAnimation
 
     private val content = verticalLayout {
         addView(tabsUi.root, LinearLayout.LayoutParams(matchParent, dp(36)))
@@ -150,8 +147,6 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     fun switchUiByState(state: ClipboardStateMachine.State) {
         Timber.d("Switch clipboard to $state")
-        if (!disableAnimation)
-            TransitionManager.beginDelayedTransition(root, Fade().apply { duration = 100L })
         when (state) {
             ClipboardStateMachine.State.Normal -> {
                 viewAnimator.displayedChild = 0

@@ -2,7 +2,7 @@ name: Build Mods (debug)
 
 on:
   push:
-    branches: [feat/mods]
+    branches: ['codex/**']
   workflow_dispatch:
 
 permissions:
