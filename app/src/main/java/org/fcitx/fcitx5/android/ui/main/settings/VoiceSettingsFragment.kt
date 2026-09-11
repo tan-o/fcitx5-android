@@ -10,7 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import android.app.AlertDialog
 import org.fcitx.fcitx5.android.input.voice.VoiceEngine
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addPreference
@@ -32,7 +32,7 @@ class VoiceSettingsFragment : PaddingPreferenceFragment() {
             addPreference("麦克风权限") { microphone.launch(Manifest.permission.RECORD_AUDIO) }
             addPreference("识别服务") {
                 val services = listOf("" to "系统离线语音") + VoiceEngine.services(ctx)
-                MaterialAlertDialogBuilder(ctx).setTitle("选择公开语音服务")
+                AlertDialog.Builder(ctx).setTitle("选择公开语音服务")
                     .setSingleChoiceItems(services.map { it.second }.toTypedArray(), services.indexOfFirst { it.first == VoiceEngine.component }) { dialog, index ->
                         VoiceEngine.component = services[index].first
                         status.summary = "已选择 ${services[index].second}；扩展服务是否离线由服务实现决定"

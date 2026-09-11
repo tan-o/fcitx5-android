@@ -6,7 +6,7 @@ import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import android.app.AlertDialog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.data.translation.DeepSeek
@@ -39,7 +39,7 @@ class DeepSeekSettingsFragment : PaddingPreferenceFragment() {
                         try {
                             val models = DeepSeek.models()
                             check(models.isNotEmpty()) { "此账号没有可用模型" }
-                            MaterialAlertDialogBuilder(ctx).setTitle("选择模型")
+                            AlertDialog.Builder(ctx).setTitle("选择模型")
                                 .setSingleChoiceItems(models.toTypedArray(), models.indexOf(DeepSeek.model)) { dialog, index ->
                                     DeepSeek.model = models[index]
                                     summary = models[index]

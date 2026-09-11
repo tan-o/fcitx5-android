@@ -5,7 +5,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import android.app.AlertDialog
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import splitties.dimensions.dp
 
@@ -29,7 +29,7 @@ class EditingHistory(private val service: FcitxInputMethodService) {
             return
         }
         val rows = LinearLayout(service).apply { orientation = LinearLayout.VERTICAL }
-        val dialog = MaterialAlertDialogBuilder(service).setTitle("编辑历史（当前输入框）")
+        val dialog = AlertDialog.Builder(service).setTitle("编辑历史（当前输入框）")
             .setView(ScrollView(service).apply { addView(rows) })
             .setNegativeButton(android.R.string.cancel, null).create()
         val children = history.nodes.groupBy { it.parent }

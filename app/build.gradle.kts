@@ -140,6 +140,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.rules)
     androidTestImplementation(libs.androidx.lifecycle.testing)
     androidTestImplementation(libs.junit)
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }
 
 configurations {
