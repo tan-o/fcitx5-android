@@ -12,6 +12,8 @@ import javax.net.ssl.HttpsURLConnection
 
 object WanxiangModel {
     private const val fileName = "wanxiang-lts-zh-hans.gram"
+    val installed: Boolean get() = File(RimeManager.userDir, fileName).isFile
+    val installedSize: Long get() = File(RimeManager.userDir, fileName).length()
     suspend fun update(progress: (String) -> Unit) = withContext(Dispatchers.IO) {
         val metadata = URL("https://api.github.com/repos/amzxyz/RIME-LMDG/releases/tags/LTS").openConnection() as HttpsURLConnection
         val asset = try {
@@ -24,6 +26,8 @@ object WanxiangModel {
         val digest = asset.getString("digest").removePrefix("sha256:")
         check(digest.matches(Regex("[a-f0-9]{64}"))) { "上游没有提供 SHA256" }
         val size = asset.getLong("size")
+        check(size > 0) { "上游模型大小无效" }
+        withContext(Dispatchers.Main) { progress("下载模型 0%（${size / 1024 / 1024} MiB）") }
         val downloadUrl = URL(asset.getString("browser_download_url"))
         check(downloadUrl.protocol == "https" && downloadUrl.host == "github.com")
         val temporary = File(RimeManager.userDir, "$fileName.downloading")
@@ -47,7 +51,7 @@ object WanxiangModel {
                     output.write(buffer, 0, n)
                     if (received - reported >= 8 * 1024 * 1024) {
                         reported = received
-                        withContext(Dispatchers.Main) { progress("下载模型 ${received * 100 / size}%") }
+                        withContext(Dispatchers.Main) { progress("下载模型 ${received * 100 / size}%（${received / 1024 / 1024}/${size / 1024 / 1024} MiB）") }
                     }
                 }
             } }

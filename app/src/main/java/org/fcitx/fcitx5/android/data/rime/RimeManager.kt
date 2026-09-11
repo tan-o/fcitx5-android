@@ -50,14 +50,18 @@ object RimeManager {
         lock.withLock {
             val root = repo.canonicalFile
             check(root.parentFile == repositories.canonicalFile)
-            val files = root.walkTopDown().onEnter { it == root || !it.name.startsWith('.') }.filter { it.isFile && !it.name.endsWith(".custom.yaml") && !it.name.startsWith('.') }.toList()
-            check(files.any { it.name.endsWith(".schema.yaml") }) { "仓库中没有 Rime schema 文件" }
+            val files = root.walkTopDown().onEnter {
+                check(!java.nio.file.Files.isSymbolicLink(it.toPath())) { "方案不能包含目录链接" }
+                it == root || !it.name.startsWith('.')
+            }.filter { it.isFile && !it.name.endsWith(".custom.yaml") && !it.name.startsWith('.') }.toList()
+            check(files.any { it.parentFile == root && it.name.endsWith(".schema.yaml") }) { "仓库根目录中没有 Rime schema 文件" }
             files.forEach { file ->
                 check(file.canonicalPath.startsWith(root.path + File.separator)) { "方案包含目录外的链接" }
             }
             // The engine is restarted only after complete files have been installed.
             files.forEach { source ->
                 val destination = File(userDir, source.relativeTo(root).path)
+                check(destination.canonicalPath.startsWith(userDir.canonicalPath + File.separator)) { "目标路径不能位于 Rime 目录外" }
                 destination.parentFile!!.mkdirs()
                 val temporary = File(destination.parentFile, destination.name + ".installing")
                 source.copyTo(temporary, overwrite = true)
@@ -85,6 +89,7 @@ object RimeManager {
         .filter { it.name.endsWith(".schema.yaml") }.map { it.name.removeSuffix(".schema.yaml") }.distinct().sorted()
 
     suspend fun setModel(schema: String, enabled: Boolean) = withContext(Dispatchers.IO) {
+        check(!enabled || WanxiangModel.installed) { "请先下载万象模型" }
         val file = customFile("$schema.custom.yaml")
         val data: MutableMap<String, Any?> = if (file.exists()) {
             val loaded = yaml().load<Map<String, Any?>>(file.readText())

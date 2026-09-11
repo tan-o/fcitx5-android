@@ -151,12 +151,3 @@ configurations {
         exclude(group = "com.louiscad.splitties", module = "splitties-systemservices")
     }
 }
-
-// The model is part of this build, not a first-run download.
-tasks.named("generateDataDescriptor") {
-    doFirst {
-        check(file("src/main/assets/usr/share/rime-data/wanxiang-lts-zh-hans.gram").isFile) {
-            "Run python3 scripts/fetch-wanxiang-model.py before building"
-        }
-    }
-}

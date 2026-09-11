@@ -734,6 +734,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        closeTranslation?.invoke()
+        stopVoiceInput?.invoke()
         keyboardTextTarget = null
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and

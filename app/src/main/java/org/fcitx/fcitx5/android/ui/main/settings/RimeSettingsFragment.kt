@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.data.rime.RimeManager
+import org.fcitx.fcitx5.android.data.rime.WanxiangModel
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import org.fcitx.fcitx5.android.utils.addCategory
 import org.fcitx.fcitx5.android.utils.addPreference
@@ -22,6 +23,8 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
     private lateinit var status: Preference
     private lateinit var repos: PreferenceCategory
     private lateinit var custom: PreferenceCategory
+    private lateinit var modelStatus: Preference
+    private lateinit var modelDownload: Preference
     private fun runOperation(block: suspend () -> Unit) {
         lifecycleScope.launch {
             preferenceScreen.isEnabled = false
@@ -57,10 +60,15 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
             }
             addPreference("重新部署", "保存修改后重新加载 Rime") { runOperation { RimeManager.redeploy() } }
             addCategory("万象语言模型") {
-                addPreference("内置简体模型", "wanxiang-lts-zh-hans · 只加载模型，不替换方案")
-                addPreference("更新万象模型", "只更新简体语言模型，并校验上游 SHA256") {
-                    runOperation { org.fcitx.fcitx5.android.data.rime.WanxiangModel.update { status.summary = it } }
+                modelStatus = Preference(ctx).apply { title = "简体语言模型" }
+                addPreference(modelStatus)
+                modelDownload = Preference(ctx).apply {
+                    setOnPreferenceClickListener {
+                        runOperation { WanxiangModel.update { status.summary = it } }
+                        true
+                    }
                 }
+                addPreference(modelDownload)
                 addPreference("为拼音方案启用／停用") {
                     val schemas = RimeManager.schemas()
                     MaterialAlertDialogBuilder(ctx).setTitle("选择已有方案").setItems(schemas.toTypedArray()) { _, i ->
@@ -79,6 +87,9 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
         refresh()
     }
     private fun refresh() {
+        modelStatus.summary = if (WanxiangModel.installed) "已下载 · ${WanxiangModel.installedSize / 1024 / 1024} MiB；可为已有拼音方案启用" else "未下载；可选下载，不影响 Rime 正常使用，不替换输入方案"
+        modelDownload.title = if (WanxiangModel.installed) "更新万象模型" else "下载万象模型"
+        modelDownload.summary = "约 401 MiB，点击后下载并校验 SHA256；完成后为需要的方案启用"
         repos.removeAll()
         RimeManager.repositories.listFiles().orEmpty().filter { File(it, ".git").isDirectory }.sortedBy { it.name }.forEach { repo ->
             repos.addPreference(repo.name) {
