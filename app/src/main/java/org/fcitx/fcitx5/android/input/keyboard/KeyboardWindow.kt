@@ -66,6 +66,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     private val translation by lazy { org.fcitx.fcitx5.android.input.translation.TranslationBar(service, theme) }
 
     fun toggleTranslation() = translation.toggle()
+    fun toggleLookup() = translation.toggle(lookup = true)
 
     val topPanel: View get() = translation.root
 

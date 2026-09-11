@@ -1,12 +1,9 @@
 # 离线手写输入
 
-使用包内 Zinnia 引擎和 Tegaki 简体中文模型，模型随 APK 打包。首次打开时只将资源复制到应用私有目录，不联网、不下载模型、不接入 Google Play Services、ML Kit 或 Firebase。
+使用 ML Kit Digital Ink Recognition 19.0.0 的简体中文笔迹模型。首次使用由用户点击下载，之后在设备上识别。模型约 20 MB，不随 APK 打包。下载需要能连接 Google 模型服务；SDK 不提供字节进度，因此界面显示不定进度条，不虚构百分比。
 
-模型文件：handwriting-zh_CN.model
-SHA-256：e16153d1ff267cd479aea260d6f71a3edda8b4ba06db2d121513adda65a4449e
-下载来源：https://github.com/alexrao/zinnia-handwriting/blob/master/res/handwriting-zh_CN.model
-原始项目和训练数据：https://github.com/tegaki/tegaki/tree/master/tegaki-models
-模型许可证：MODEL-LICENSE.txt（LGPL 2.1）；引擎许可证：ZINNIA-LICENSE.txt（BSD）。
+保留笔画时间与连续轨迹，按实际笔迹包围盒平移，避免在画布上写偏导致识别坐标发生变化。
+接入文档：https://developers.google.com/ml-kit/vision/digital-ink-recognition/android
 
 pinyin.txt 来自 mozillazg/pinyin-data 的通规字常用读音，用于候选注音，多音字不做上下文判断。
 

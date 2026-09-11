@@ -38,6 +38,8 @@ object AppUtil {
 
     fun launchMainToTranslation(context: Context) =
         launchMainToDest(context, SettingsRoute.DeepSeekTranslation)
+    fun launchMainToLookup(context: Context) =
+        launchMainToDest(context, SettingsRoute.WordLookup)
 
     fun launchMainToKeyboard(context: Context) =
         launchMainToDest(context, SettingsRoute.VirtualKeyboard)

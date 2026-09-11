@@ -86,6 +86,8 @@ ksp {
 }
 
 dependencies {
+    implementation("com.google.mlkit:digital-ink-recognition:19.0.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
     implementation("org.eclipse.jgit:org.eclipse.jgit:7.8.0.202609011348-r")
     implementation("org.yaml:snakeyaml:2.4")
     ksp(project(":codegen"))

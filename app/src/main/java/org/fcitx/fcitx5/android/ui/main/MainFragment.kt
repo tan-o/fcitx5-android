@@ -93,6 +93,9 @@ class MainFragment : PaddingPreferenceFragment() {
                 addPreference("DeepSeek 翻译", icon = R.drawable.ic_baseline_language_24) {
                     navigateWithAnim(SettingsRoute.DeepSeekTranslation)
                 }
+                addPreference("墨墨查词", icon = R.drawable.ic_baseline_search_24) {
+                    navigateWithAnim(SettingsRoute.WordLookup)
+                }
                 addDestinationPreference(
                     R.string.theme,
                     R.drawable.ic_baseline_palette_24,

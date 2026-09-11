@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.ProgressBar
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,7 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
     private lateinit var canvas: HandwritingCanvasView
     private lateinit var candidates: LinearLayout
     private lateinit var status: TextView
+    private lateinit var downloadProgress: ProgressBar
     private var classifyJob: Job? = null
     private var modelJob: Job? = null
     private var attached = false
@@ -63,15 +65,20 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
             }
             onStrokesChanged = { classify(it) }
         }
+        downloadProgress = ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal).apply {
+            visibility = View.GONE
+            isIndeterminate = true
+        }
         return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             backgroundColor = theme.keyboardColor
             addView(status, LinearLayout.LayoutParams(-1, context.dp(40)))
+            addView(downloadProgress, LinearLayout.LayoutParams(-1, context.dp(4)))
             addView(canvas, LinearLayout.LayoutParams(-1, 0, 1f))
         }
     }
 
-    private fun prepareModel() {
+    private fun prepareModel(download: Boolean = false) {
         if (modelJob?.isActive == true) return
         status.visibility = View.VISIBLE
         status.setText(R.string.handwriting_model_checking)
@@ -79,7 +86,17 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
         modelJob = service.lifecycleScope.launch {
             try {
                 val engine = recognizer ?: HandwritingRecognizer().also { recognizer = it }
-                if (!engine.isReady() || !attached) return@launch
+                if (download) {
+                    status.text = "正在下载中文手写模型（约 20 MB）…"
+                    downloadProgress.visibility = View.VISIBLE
+                    engine.download()
+                }
+                if (!attached) return@launch
+                if (!engine.isReady()) {
+                    status.text = "点击下载中文手写模型（约 20 MB）"
+                    status.setOnClickListener { prepareModel(true) }
+                    return@launch
+                }
                 ready = true
                 canvas.isEnabled = true
                 status.visibility = View.GONE
@@ -90,8 +107,10 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
             } catch (e: Exception) {
                 Timber.w(e, "Handwriting model unavailable")
                 status.visibility = View.VISIBLE
-                status.setText(R.string.handwriting_model_retry)
-                status.setOnClickListener { prepareModel() }
+                status.text = "${e.localizedMessage ?: "手写模型不可用"}；点击重试"
+                status.setOnClickListener { prepareModel(true) }
+            } finally {
+                downloadProgress.visibility = View.GONE
             }
         }
     }
