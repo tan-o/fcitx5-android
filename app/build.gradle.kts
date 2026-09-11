@@ -86,6 +86,8 @@ ksp {
 }
 
 dependencies {
+    implementation("com.k2fsa:sherpa-onnx:1.13.8@aar")
+    implementation("org.apache.commons:commons-compress:1.28.0")
     implementation("com.google.mlkit:digital-ink-recognition:19.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
     implementation("org.eclipse.jgit:org.eclipse.jgit:7.8.0.202609011348-r")

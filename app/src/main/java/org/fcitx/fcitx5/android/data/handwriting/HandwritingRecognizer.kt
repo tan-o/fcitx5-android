@@ -2,20 +2,20 @@ package org.fcitx.fcitx5.android.data.handwriting
 
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
-import com.google.mlkit.vision.digitalink.DigitalInkRecognition
-import com.google.mlkit.vision.digitalink.DigitalInkRecognitionModel
-import com.google.mlkit.vision.digitalink.DigitalInkRecognitionModelIdentifier
-import com.google.mlkit.vision.digitalink.DigitalInkRecognizerOptions
-import com.google.mlkit.vision.digitalink.Ink
-import com.google.mlkit.vision.digitalink.RecognitionContext
-import com.google.mlkit.vision.digitalink.WritingArea
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognition
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModel
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModelIdentifier
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognizerOptions
+import com.google.mlkit.vision.digitalink.recognition.Ink
+import com.google.mlkit.vision.digitalink.recognition.RecognitionContext
+import com.google.mlkit.vision.digitalink.recognition.WritingArea
 import kotlinx.coroutines.tasks.await
 
 /** Recognizes the actual pen trajectory, including continuous cursive strokes. */
 class HandwritingRecognizer : AutoCloseable {
     data class Point(val x: Float, val y: Float, val time: Long)
     private val model = DigitalInkRecognitionModel.builder(
-        requireNotNull(DigitalInkRecognitionModelIdentifier.fromLanguageTag("zh-Hans"))
+        DigitalInkRecognitionModelIdentifier.ZH_HANI_CN
     ).build()
     private val models = RemoteModelManager.getInstance()
     private val recognizer = DigitalInkRecognition.getClient(DigitalInkRecognizerOptions.builder(model).build())

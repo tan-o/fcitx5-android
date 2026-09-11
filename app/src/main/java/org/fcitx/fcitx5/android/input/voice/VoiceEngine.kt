@@ -11,6 +11,12 @@ import org.fcitx.fcitx5.android.utils.appContext
 
 object VoiceEngine {
     private val prefs get() = appContext.getSharedPreferences("voice", 0)
+    var local: Boolean
+        get() = prefs.getBoolean("local", true)
+        set(value) { prefs.edit().putBoolean("local", value).apply() }
+    var hotwords: String
+        get() = prefs.getString("hotwords", "")!!
+        set(value) { prefs.edit().putString("hotwords", value).apply() }
     var component: String
         get() = prefs.getString("component", "")!!
         set(value) { prefs.edit().putString("component", value).apply() }

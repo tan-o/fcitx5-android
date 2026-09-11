@@ -10,6 +10,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
+import androidx.preference.SwitchPreferenceCompat
+import androidx.lifecycle.lifecycleScope
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import org.fcitx.fcitx5.android.input.voice.OfflineSpeechModel
 import android.app.AlertDialog
 import org.fcitx.fcitx5.android.input.voice.VoiceEngine
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
@@ -29,6 +37,54 @@ class VoiceSettingsFragment : PaddingPreferenceFragment() {
                 summary = "通过系统公开语音服务在键盘内识别。Samsung 键盘私有模型只有在其提供公开服务时才能使用。"
             }
             addPreference(status)
+            addPreference(SwitchPreferenceCompat(ctx).apply {
+                title = "使用 Qwen3-ASR 本地模型"
+                summary = "支持粤语、普通话和英文；关闭后使用下方选择的系统公开服务"
+                isPersistent = false
+                isChecked = VoiceEngine.local
+                setOnPreferenceChangeListener { _, value -> VoiceEngine.local = value as Boolean; true }
+            })
+            addPreference(EditTextPreference(ctx).apply {
+                key = "voice_hotwords_editor"
+                title = "语音模型提示词／热词"
+                dialogMessage = "填写人名、地名或专业词语，帮助模型转写；此接口提供热词上下文，不是聊天系统提示词。"
+                isPersistent = false
+                text = VoiceEngine.hotwords
+                summary = text?.ifBlank { "未设置" }
+                setOnPreferenceChangeListener { _, value ->
+                    val words = value.toString().trim()
+                    if (words.length > 2000) false else { VoiceEngine.hotwords = words; summary = words.ifBlank { "未设置" }; true }
+                }
+            })
+            addPreference("下载 Qwen3-ASR 0.6B INT8", "${if (OfflineSpeechModel.installed) "已安装" else "未安装"} · 下载约 838 MiB，解压约 940 MiB；需要 2 GiB 可用空间") {
+                lifecycleScope.launch {
+                    val message = TextView(ctx).apply { text = "准备下载…" }
+                    val progress = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply { isIndeterminate = true }
+                    val panel = LinearLayout(ctx).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(32, 24, 32, 24)
+                        addView(message)
+                        addView(progress, LinearLayout.LayoutParams(-1, -2))
+                    }
+                    val task = kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]
+                    val dialog = AlertDialog.Builder(ctx).setTitle("Qwen3-ASR").setView(panel)
+                        .setNegativeButton("取消") { _, _ -> task?.cancel() }.create()
+                    dialog.setCanceledOnTouchOutside(false)
+                    dialog.setOnCancelListener { task?.cancel() }
+                    dialog.show()
+                    preferenceScreen.isEnabled = false
+                    try {
+                        OfflineSpeechModel.download { received, total, label ->
+                            progress.isIndeterminate = total == 0L
+                            if (total > 0) progress.progress = (received * 100 / total).toInt()
+                            message.text = if (total > 0) "$label ${progress.progress}%\n${received / 1024 / 1024}/${total / 1024 / 1024} MiB" else label
+                        }
+                        status.summary = "Qwen3-ASR 已安装，可在键盘中直接使用"
+                    } catch (e: CancellationException) { status.summary = "下载已取消"; throw e }
+                    catch (e: Exception) { status.summary = e.message }
+                    finally { dialog.dismiss(); preferenceScreen.isEnabled = true }
+                }
+            }
             addPreference("麦克风权限") { microphone.launch(Manifest.permission.RECORD_AUDIO) }
             addPreference("识别服务") {
                 val services = listOf("" to "系统离线语音") + VoiceEngine.services(ctx)

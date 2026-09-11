@@ -11,6 +11,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.wm.InputWindow
@@ -20,6 +21,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), RecognitionL
     private val service by manager.inputMethodService()
     private val theme by manager.theme()
     private var recognizer: SpeechRecognizer? = null
+    private var localSession: OfflineVoiceSession? = null
     private var active = false
     private var result = ""
     private lateinit var preview: TextView
@@ -29,7 +31,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), RecognitionL
         preview = TextView(context).apply { textSize = 20f; gravity = Gravity.CENTER; setTextColor(theme.keyTextColor) }
         addView(preview, LinearLayout.LayoutParams(-1, 0, 1f))
         addView(LinearLayout(context).apply {
-            listOf("开始" to { start() }, "停止" to { recognizer?.stopListening(); Unit }, "插入" to {
+            listOf("开始" to { start() }, "停止" to { localSession?.finishRecording(); recognizer?.stopListening(); Unit }, "插入" to {
                 if (result.isNotEmpty()) { service.commitText(result); result = ""; preview.text = "" }
             }, "设置" to { AppUtil.launchMainToVoice(context) }).forEach { (label, action) ->
                 addView(Button(context).apply { text = label; setOnClickListener { action() } }, LinearLayout.LayoutParams(0, -2, 1f))
@@ -46,6 +48,14 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), RecognitionL
         result = ""
         recognizer?.destroy()
         recognizer = null
+        localSession?.cancel()
+        localSession = null
+        if (VoiceEngine.local) {
+            localSession = OfflineVoiceSession(service.lifecycleScope,
+                { if (active) preview.text = it },
+                { if (active) { result = it; preview.text = it } })
+            return
+        }
         try {
             recognizer = VoiceEngine.create(context).also {
                 it.setRecognitionListener(this)
@@ -55,7 +65,7 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), RecognitionL
         } catch (e: Exception) { preview.text = e.message }
     }
     override fun onAttached() { active = true; start() }
-    private fun stop() { active = false; recognizer?.cancel(); recognizer?.destroy(); recognizer = null; result = ""; service.stopVoiceInput = null }
+    private fun stop() { active = false; localSession?.cancel(); localSession = null; recognizer?.cancel(); recognizer?.destroy(); recognizer = null; result = ""; service.stopVoiceInput = null }
     override fun onDetached() { stop() }
     override fun onReadyForSpeech(params: Bundle?) { if (active) preview.text = "正在聆听…" }
     override fun onBeginningOfSpeech() {}
