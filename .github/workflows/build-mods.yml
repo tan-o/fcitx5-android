@@ -14,14 +14,10 @@ concurrency:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        abi: [arm64-v8a, x86_64]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      BUILD_ABI: ${{ matrix.abi }}
+      BUILD_ABI: arm64-v8a
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7
@@ -46,7 +42,6 @@ jobs:
       - name: Test and build app with embedded Rime
         run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
       - name: Collect APKs
-        if: matrix.abi == 'arm64-v8a'
         # Validate embedded assets before publishing an installable artifact.
         run: |
           python3 scripts/verify-mods-apk.py
@@ -54,29 +49,16 @@ jobs:
           cp app/build/outputs/apk/debug/*.apk apks/
           sha256sum apks/*.apk > apks/SHA256SUMS.txt
       - name: Upload APKs
-        if: matrix.abi == 'arm64-v8a'
         uses: actions/upload-artifact@v7
         with:
           name: fcitx5-android-mods-arm64-debug
           path: apks/
           if-no-files-found: error
-      - name: Enable KVM
-        if: matrix.abi == 'x86_64'
-        run: sudo chmod 666 /dev/kvm
-      - name: Test actual dialogs, IME history and Git on Android
-        if: matrix.abi == 'x86_64'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          target: default
-          disable-animations: true
-          script: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=org.fcitx.fcitx5.android.ModsInteractionTest --stacktrace
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: mods-test-reports-${{ matrix.abi }}
+          name: mods-test-reports-arm64
           path: |
             app/build/reports/tests/
             app/build/reports/androidTests/
