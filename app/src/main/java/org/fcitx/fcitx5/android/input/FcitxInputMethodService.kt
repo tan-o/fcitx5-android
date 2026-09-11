@@ -232,6 +232,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     val editingHistory by lazy { org.fcitx.fcitx5.android.input.history.EditingHistory(this) }
 
     var keyboardTextTarget: org.fcitx.fcitx5.android.input.translation.KeyboardTextTarget? = null
+    var closeTranslation: (() -> Unit)? = null
+    var stopVoiceInput: (() -> Unit)? = null
 
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         if (keyboardTextTarget?.consume(event) == true) return
@@ -1059,6 +1061,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        closeTranslation?.invoke()
+        stopVoiceInput?.invoke()
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
@@ -1075,6 +1079,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onFinishInput() {
+        closeTranslation?.invoke()
+        stopVoiceInput?.invoke()
         keyboardTextTarget = null
         editingHistory.reset(false)
         Timber.d("onFinishInput")

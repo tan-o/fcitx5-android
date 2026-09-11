@@ -63,7 +63,7 @@ object RimeManager {
                 source.copyTo(temporary, overwrite = true)
                 check(temporary.renameTo(destination)) { "无法安装 ${source.name}" }
             }
-            FcitxDaemon.restartFcitx()
+            redeploy()
         }
     }
     fun customFiles(): List<File> = userDir.listFiles().orEmpty().filter { it.isFile && it.name.endsWith(".custom.yaml") }.sortedBy { it.name }
@@ -81,7 +81,7 @@ object RimeManager {
             check(temporary.renameTo(file)) { "保存失败" }
         }
     }
-    fun schemas(): List<String> = (userDir.listFiles().orEmpty() + sharedDir.listFiles().orEmpty())
+    fun schemas(): List<String> = (userDir.listFiles().orEmpty().toList() + sharedDir.listFiles().orEmpty().toList())
         .filter { it.name.endsWith(".schema.yaml") }.map { it.name.removeSuffix(".schema.yaml") }.distinct().sorted()
 
     suspend fun setModel(schema: String, enabled: Boolean) = withContext(Dispatchers.IO) {
@@ -97,5 +97,10 @@ object RimeManager {
         data["patch"] = patch
         saveCustom(file.name, Yaml().dump(data))
     }
-    suspend fun redeploy() = withContext(Dispatchers.IO) { FcitxDaemon.restartFcitx() }
+    suspend fun redeploy() = withContext(Dispatchers.IO) {
+        val name = "rime-deploy-${java.util.UUID.randomUUID()}"
+        val connection = FcitxDaemon.connect(name)
+        try { connection.runOnReady { setAddonSubConfig("rime", "deploy") } }
+        finally { FcitxDaemon.disconnect(name) }
+    }
 }

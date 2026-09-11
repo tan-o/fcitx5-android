@@ -37,6 +37,8 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), RecognitionL
         })
     }
     private fun start() {
+        active = true
+        service.stopVoiceInput = { stop() }
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             preview.text = "请在语音设置中允许麦克风权限"
             return
@@ -53,7 +55,8 @@ class VoiceWindow : InputWindow.ExtendedInputWindow<VoiceWindow>(), RecognitionL
         } catch (e: Exception) { preview.text = e.message }
     }
     override fun onAttached() { active = true; start() }
-    override fun onDetached() { active = false; recognizer?.cancel(); recognizer?.destroy(); recognizer = null; result = "" }
+    private fun stop() { active = false; recognizer?.cancel(); recognizer?.destroy(); recognizer = null; result = ""; service.stopVoiceInput = null }
+    override fun onDetached() { stop() }
     override fun onReadyForSpeech(params: Bundle?) { if (active) preview.text = "正在聆听…" }
     override fun onBeginningOfSpeech() {}
     override fun onRmsChanged(rmsdB: Float) {}

@@ -24,7 +24,7 @@ class EditingHistory(private val service: FcitxInputMethodService) {
     }
     fun show() {
         capture()
-        if (!enabled || history.nodes.isEmpty()) {
+        if (!enabled || service.keyboardTextTarget != null || history.nodes.isEmpty()) {
             Toast.makeText(service, "当前输入框未提供可用的编辑历史", Toast.LENGTH_SHORT).show()
             return
         }
@@ -52,11 +52,12 @@ class EditingHistory(private val service: FcitxInputMethodService) {
                         try {
                             service.finishComposing()
                             ic.beginBatchEdit()
-                            ic.setSelection(0, live.text.length)
-                            ic.commitText(node.text, 1)
-                            ic.setSelection(node.start.coerceIn(0, node.text.length), node.end.coerceIn(0, node.text.length))
-                            ic.endBatchEdit()
-                            history.select(node.id)
+                            try {
+                                if (ic.setSelection(0, live.text.length) && ic.commitText(node.text, 1)) {
+                                    ic.setSelection(node.start.coerceIn(0, node.text.length), node.end.coerceIn(0, node.text.length))
+                                    history.select(node.id)
+                                }
+                            } finally { ic.endBatchEdit() }
                         } finally { restoring = false }
                         dialog.dismiss()
                     }

@@ -73,6 +73,7 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
             return
         }
         root.visibility = View.VISIBLE
+        service.closeTranslation = { close() }
         source.setText("")
         source.requestFocus()
         service.finishComposing()
@@ -93,16 +94,22 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
     }
     private fun translate() {
         val text = source.text.toString().trim()
+        val language = DeepSeek.language
         if (text.isEmpty() || task?.isActive == true) return
         translate.isEnabled = false
         task = service.lifecycleScope.launch {
             try {
-                val output = DeepSeek.translate(text, DeepSeek.language)
+                val output = DeepSeek.translate(text, language)
+                if (source.text.toString().trim() != text || DeepSeek.language != language) {
+                    Toast.makeText(service, "原文或目标语言已变化，请重新翻译", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
                 service.postFcitxJob { focusOutIn() }.join()
                 if (service.keyboardTextTarget !== target) return@launch
                 service.keyboardTextTarget = null
                 target = null
                 root.visibility = View.GONE
+                service.closeTranslation = null
                 service.commitText(output)
                 refreshBalance()
             } catch (e: CancellationException) { throw e }
@@ -114,6 +121,7 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         if (root.visibility != View.VISIBLE && target == null) return
         task?.cancel()
         balanceJob?.cancel()
+        service.closeTranslation = null
         root.visibility = View.GONE
         val previous = target
         target = null
