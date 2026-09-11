@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="space_cursor_step">光标每格滑动距离（越大越不灵敏）</string>
     <string name="app_name_release">小企鹅输入法</string>
     <string name="app_name_debug">小企鹅输入法 (调试)</string>
     <string name="save">保存</string>

@@ -6,6 +6,8 @@ package org.fcitx.fcitx5.android.input.keyboard
 
 import android.content.Context
 import android.graphics.Rect
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.view.MotionEvent
 import androidx.annotation.CallSuper
 import androidx.annotation.DrawableRes
@@ -70,6 +72,30 @@ abstract class BaseKeyboard(
     var popupActionListener: PopupActionListener? = null
 
     private val selectionSwipeThreshold = dp(10f)
+    private var trackpadActive = false
+    private val trackpadPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    override fun dispatchDraw(canvas: Canvas) {
+        if (!trackpadActive) {
+            super.dispatchDraw(canvas)
+            return
+        }
+        canvas.drawColor(theme.keyboardColor)
+        trackpadPaint.color = theme.keyBackgroundColor
+        canvas.drawRoundRect(dp(8f), dp(8f), width - dp(8f), height - dp(8f), dp(12f), dp(12f), trackpadPaint)
+        trackpadPaint.color = theme.spaceBarColor
+        canvas.drawRoundRect(width / 2f - dp(24f), height / 2f - dp(2f), width / 2f + dp(24f), height / 2f + dp(2f), dp(2f), dp(2f), trackpadPaint)
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (trackpadActive && event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) return true
+        val handled = super.dispatchTouchEvent(event)
+        if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+            trackpadActive = false
+            invalidate()
+        }
+        return handled
+    }
     private val inputSwipeThreshold = dp(36f)
 
     // a rather large threshold effectively disables swipe of the direction
@@ -155,13 +181,19 @@ abstract class BaseKeyboard(
                 spaceKeys.add(this)
                 swipeEnabled = spaceSwipeMoveCursor.getValue()
                 swipeRepeatEnabled = true
-                swipeThresholdX = selectionSwipeThreshold
+                swipeThresholdX = dp(prefs.keyboard.spaceCursorStep.getValue().toFloat())
                 swipeThresholdY = disabledSwipeThreshold
                 onGestureListener = OnGestureListener { view, event ->
                     when (event.type) {
+                        GestureType.Down -> {
+                            swipeThresholdX = dp(prefs.keyboard.spaceCursorStep.getValue().toFloat())
+                            false
+                        }
                         GestureType.Move -> when (val count = event.countX) {
                             0 -> false
                             else -> {
+                                trackpadActive = true
+                                invalidate()
                                 val sym =
                                     if (count > 0) FcitxKeyMapping.FcitxKey_Right else FcitxKeyMapping.FcitxKey_Left
                                 val action = KeyAction.SymAction(KeySym(sym), KeyStates.Virtual)
@@ -501,6 +533,8 @@ abstract class BaseKeyboard(
     }
 
     open fun onDetach() {
+        trackpadActive = false
+        invalidate()
         releaseAllTouchTargets()
     }
 

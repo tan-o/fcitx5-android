@@ -57,6 +57,7 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
     private val translate = button("译").apply { setOnClickListener { translate() } }
     val root = LinearLayout(service).apply {
         orientation = LinearLayout.HORIZONTAL
+        minimumHeight = service.dp(48)
         gravity = Gravity.CENTER_VERTICAL
         visibility = View.GONE
         addView(language, LinearLayout.LayoutParams(-2, -1))

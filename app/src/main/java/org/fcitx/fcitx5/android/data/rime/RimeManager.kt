@@ -108,4 +108,46 @@ object RimeManager {
         try { connection.runOnReady { setAddonSubConfig("rime", "deploy") } }
         finally { FcitxDaemon.disconnect(name) }
     }
+
+    val grammarDefaults: Map<String, Number> = linkedMapOf(
+        "collocation_max_length" to 4, "collocation_min_length" to 3,
+        "collocation_penalty" to -12.0, "non_collocation_penalty" to -12.0,
+        "weak_collocation_penalty" to -24.0, "rear_penalty" to -18.0
+    )
+
+    suspend fun grammarOverrides(schema: String): Map<String, String> = withContext(Dispatchers.IO) {
+        val file = customFile("$schema.custom.yaml")
+        if (!file.exists()) return@withContext emptyMap()
+        val data = yaml().load<Map<String, Any?>>(file.readText())
+        val patch = data["patch"] as? Map<*, *> ?: error("patch 必须是映射")
+        grammarDefaults.keys.mapNotNull { key ->
+            (patch["grammar/$key"] ?: (patch["grammar"] as? Map<*, *>)?.get(key))?.let { key to it.toString() }
+        }.toMap()
+    }
+
+    suspend fun setGrammarOverrides(schema: String, values: Map<String, String>) = withContext(Dispatchers.IO) {
+        val parsed = values.filterValues { it.isNotBlank() }.mapValues { (key, value) ->
+            require(key in grammarDefaults)
+            if (key.endsWith("_length")) value.toInt().also { require(it > 0) { "搭配长度必须大于 0" } }
+            else value.toDouble().also { require(it.isFinite()) { "参数必须是有限数字" } }
+        }
+        val min = parsed["collocation_min_length"]?.toInt()
+        val max = parsed["collocation_max_length"]?.toInt()
+        require(min == null || max == null || min <= max) { "最短搭配不能超过最长搭配" }
+        val file = customFile("$schema.custom.yaml")
+        val data = if (file.exists()) yaml().load<Map<String, Any?>>(file.readText()).toMutableMap()
+            else linkedMapOf<String, Any?>("patch" to linkedMapOf<String, Any?>())
+        @Suppress("UNCHECKED_CAST")
+        val patch = (data["patch"] as? Map<String, Any?>)?.toMutableMap() ?: error("patch 必须是映射")
+        @Suppress("UNCHECKED_CAST")
+        val nested = (patch["grammar"] as? Map<String, Any?>)?.toMutableMap()
+        grammarDefaults.keys.forEach { key ->
+            nested?.remove(key)
+            patch.remove("grammar/$key")
+            parsed[key]?.let { patch["grammar/$key"] = it }
+        }
+        if (nested != null) patch["grammar"] = nested
+        data["patch"] = patch
+        saveCustom(file.name, Yaml().dump(data))
+    }
 }

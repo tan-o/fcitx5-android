@@ -263,8 +263,13 @@ class InputView(
 
         updateKeyboardSize()
 
-        add(preedit.ui.root, lParams(matchParent, wrapContent) {
+        val topPanel = keyboardWindow.topPanel.apply { id = View.generateViewId() }
+        add(topPanel, lParams(matchParent, wrapContent) {
             above(keyboardView)
+            centerHorizontally()
+        })
+        add(preedit.ui.root, lParams(matchParent, wrapContent) {
+            above(topPanel)
             centerHorizontally()
         })
         add(keyboardView, lParams(matchParent, wrapContent) {

@@ -4,6 +4,9 @@ import android.os.Bundle
 import android.text.InputType
 import android.widget.EditText
 import android.widget.ScrollView
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
@@ -60,11 +63,40 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
             }
             addPreference("重新部署", "保存修改后重新加载 Rime") { runOperation { RimeManager.redeploy() } }
             addCategory("万象语言模型") {
+                addPreference("语言模型参数", "按方案修改搭配长度和惩罚分数，保存到 .custom.yaml") {
+                    val schemas = RimeManager.schemas()
+                    AlertDialog.Builder(ctx).setTitle("选择已有方案")
+                        .setItems(schemas.toTypedArray()) { _, index -> editGrammar(schemas[index]) }.show()
+                }
                 modelStatus = Preference(ctx).apply { title = "简体语言模型" }
                 addPreference(modelStatus)
                 modelDownload = Preference(ctx).apply {
                     setOnPreferenceClickListener {
-                        runOperation { WanxiangModel.update { status.summary = it } }
+                        runOperation {
+                            val message = TextView(ctx).apply { text = "正在查询模型版本…" }
+                            val progress = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply { isIndeterminate = true }
+                            val panel = LinearLayout(ctx).apply {
+                                orientation = LinearLayout.VERTICAL
+                                val padding = (24 * resources.displayMetrics.density).toInt()
+                                setPadding(padding, padding, padding, padding)
+                                addView(message)
+                                addView(progress, LinearLayout.LayoutParams(-1, -2))
+                            }
+                            val task = kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]
+                            val dialog = AlertDialog.Builder(ctx).setTitle("下载万象模型").setView(panel)
+                                .setNegativeButton("取消") { _, _ -> task?.cancel() }.create()
+                            dialog.setCanceledOnTouchOutside(false)
+                            dialog.setOnCancelListener { task?.cancel() }
+                            dialog.show()
+                            try {
+                                WanxiangModel.update { received, total ->
+                                    progress.isIndeterminate = false
+                                    progress.progress = (received * 100 / total).toInt()
+                                    message.text = if (received == total) "下载完成，正在校验和部署…" else
+                                        "${progress.progress}% · ${received / 1024 / 1024}/${total / 1024 / 1024} MiB"
+                                }
+                            } finally { dialog.dismiss() }
+                        }
                         true
                     }
                 }
@@ -107,6 +139,44 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
         }
         custom.removeAll()
         RimeManager.customFiles().forEach { file -> custom.addPreference(file.name) { edit(file) } }
+    }
+    private fun editGrammar(schema: String) {
+        lifecycleScope.launch {
+            try {
+                val overrides = RimeManager.grammarOverrides(schema)
+                val ctx = requireContext()
+                val panel = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL; setPadding(32, 16, 32, 16) }
+                panel.addView(TextView(ctx).apply { text = "留空表示不覆盖方案原值。下方提示为引擎默认值，并非方案当前生效值。" })
+                val labels = listOf("最长搭配", "最短搭配", "搭配惩罚", "非搭配惩罚", "弱搭配惩罚", "尾部惩罚")
+                val fields = RimeManager.grammarDefaults.entries.mapIndexed { index, (key, default) ->
+                    panel.addView(TextView(ctx).apply { text = "${labels[index]} · $key" })
+                    key to EditText(ctx).apply {
+                        inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED or
+                            (if (key.endsWith("_length")) 0 else InputType.TYPE_NUMBER_FLAG_DECIMAL)
+                        hint = "引擎默认：$default"
+                        setText(overrides[key].orEmpty())
+                        panel.addView(this)
+                    }
+                }.toMap()
+                val dialog = AlertDialog.Builder(ctx).setTitle(schema)
+                    .setView(ScrollView(ctx).apply { addView(panel) })
+                    .setPositiveButton("保存并部署", null).setNegativeButton(android.R.string.cancel, null).create()
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        lifecycleScope.launch {
+                            try {
+                                RimeManager.setGrammarOverrides(schema, fields.mapValues { it.value.text.toString().trim() })
+                                dialog.dismiss()
+                                runOperation { RimeManager.redeploy() }
+                            } catch (e: CancellationException) { throw e }
+                            catch (e: Exception) { fields.values.first().error = e.message }
+                        }
+                    }
+                }
+                dialog.show()
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { status.summary = e.message }
+        }
     }
     private fun edit(file: File) {
         lifecycleScope.launch {

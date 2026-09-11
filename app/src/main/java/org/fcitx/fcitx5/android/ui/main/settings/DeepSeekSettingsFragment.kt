@@ -17,6 +17,26 @@ class DeepSeekSettingsFragment : PaddingPreferenceFragment() {
         val ctx = requireContext()
         preferenceScreen = preferenceManager.createPreferenceScreen(ctx).apply {
             addPreference(EditTextPreference(ctx).apply {
+                key = "deepseek_prompt_editor"
+                title = "翻译提示词"
+                dialogMessage = "{targetLanguage} 会替换成选择的目标语言。"
+                isPersistent = false
+                text = DeepSeek.prompt
+                summary = DeepSeek.prompt
+                setOnBindEditTextListener { field ->
+                    field.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                    field.minLines = 4
+                }
+                setOnPreferenceChangeListener { _, value ->
+                    val prompt = value.toString().trim()
+                    if (prompt.isBlank()) false else {
+                        DeepSeek.prompt = prompt
+                        summary = prompt
+                        true
+                    }
+                }
+            })
+            addPreference(EditTextPreference(ctx).apply {
                 key = "deepseek_key_editor"
                 title = "API Key"
                 summary = "保存在设备密钥库；留空可删除。文本只在点击翻译时发送。"

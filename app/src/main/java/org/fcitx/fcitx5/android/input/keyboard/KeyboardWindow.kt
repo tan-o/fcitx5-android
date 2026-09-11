@@ -67,6 +67,8 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     fun toggleTranslation() = translation.toggle()
 
+    val topPanel: View get() = translation.root
+
     private lateinit var keyboardView: FrameLayout
 
     private val keyboards: HashMap<String, BaseKeyboard> by lazy {
@@ -96,11 +98,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
     override fun onCreateView(): View {
         keyboardView = context.frameLayout(R.id.keyboard_view)
         attachLayout(TextKeyboard.Name)
-        return android.widget.LinearLayout(context).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            addView(translation.root, android.widget.LinearLayout.LayoutParams(-1, context.resources.displayMetrics.density.times(48).toInt()))
-            addView(keyboardView, android.widget.LinearLayout.LayoutParams(-1, 0, 1f))
-        }
+        return keyboardView
     }
 
     private fun detachCurrentLayout() {
