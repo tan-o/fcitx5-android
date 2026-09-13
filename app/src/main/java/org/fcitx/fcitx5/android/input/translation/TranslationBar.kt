@@ -18,7 +18,6 @@ import org.fcitx.fcitx5.android.data.translation.DeepSeek
 import org.fcitx.fcitx5.android.data.translation.Maimemo
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
-import org.fcitx.fcitx5.android.utils.AppUtil
 import splitties.dimensions.dp
 
 class TranslationBar(private val service: FcitxInputMethodService, private val theme: Theme) {
@@ -66,10 +65,6 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         addView(source, LinearLayout.LayoutParams(0, -1, 1f))
         addView(balance, LinearLayout.LayoutParams(-2, -1))
         addView(translate, LinearLayout.LayoutParams(service.dp(40), -1))
-        addView(button("⚙").apply { setOnClickListener {
-            try { if (lookupMode) AppUtil.launchMainToLookup(service) else AppUtil.launchMainToTranslation(service) }
-            catch (e: Exception) { Toast.makeText(service, e.message, Toast.LENGTH_LONG).show() }
-        } }, LinearLayout.LayoutParams(service.dp(36), -1))
         addView(button("×").apply { setOnClickListener { close() } }, LinearLayout.LayoutParams(service.dp(40), -1))
     }
     private val result = TextView(service).apply {
@@ -124,8 +119,8 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
                 if (root.visibility != View.VISIBLE) return@launch
                 target = KeyboardTextTarget(source).also { service.keyboardTextTarget = it }
                 when {
-                    lookupMode && !Maimemo.configured -> showResult("点击 ⚙ 设置墨墨 API Token 后即可查词。")
-                    !lookupMode && !DeepSeek.configured -> showResult("点击 ⚙ 设置 DeepSeek API Key 后即可翻译。")
+                    lookupMode && !Maimemo.configured -> showResult("请先在应用设置的“墨墨查词”中填写 API Token。")
+                    !lookupMode && !DeepSeek.configured -> showResult("请先在应用设置的“DeepSeek 翻译”中填写 API Key。")
                     !lookupMode -> refreshBalance()
                 }
             } catch (e: CancellationException) {
@@ -163,12 +158,13 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
                     return@launch
                 }
                 service.postFcitxJob { focusOutIn() }.join()
-                if (service.keyboardTextTarget !== target) return@launch
+                val previousTarget = target ?: return@launch
+                if (service.keyboardTextTarget !== previousTarget) return@launch
                 service.keyboardTextTarget = null
-                target = null
-                root.visibility = View.GONE
-                service.closeTranslation = null
                 service.commitText(output)
+                source.text.clear()
+                target = KeyboardTextTarget(source).also { service.keyboardTextTarget = it }
+                showResult(output)
                 refreshBalance()
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {

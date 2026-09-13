@@ -56,17 +56,20 @@ object Maimemo {
             val body = (if (code in 200..299) connection.inputStream else connection.errorStream)
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
             val root = runCatching { JSONObject(body) }.getOrElse { error("墨墨返回了无法解析的响应（HTTP $code）") }
-            val error = root.optJSONArray("errors")?.optJSONObject(0)?.optString("msg").orEmpty()
-            check(code in 200..299 && root.optBoolean("success")) {
+            val firstError = root.optJSONArray("errors")?.optJSONObject(0)
+            val error = firstError?.optString("message").orEmpty()
+                .ifBlank { firstError?.optString("msg").orEmpty() }
+            check(code in 200..299 && root.optBoolean("success", true)) {
                 error.ifBlank { "墨墨 HTTP $code" }
             }
-            return root.getJSONObject("data")
+            return root.optJSONObject("data") ?: root
         } finally { connection.disconnect() }
     }
     suspend fun lookup(spelling: String): String = withContext(Dispatchers.IO) {
         val query = spelling.trim()
         require(query.matches(Regex("[A-Za-z][A-Za-z .'-]{0,63}"))) { "请输入英文单词或短语" }
-        val voc = request("vocabulary?spelling=${URLEncoder.encode(query, "UTF-8")}").getJSONObject("voc")
+        val voc = request("vocabulary?spelling=${URLEncoder.encode(query, "UTF-8")}")
+            .optJSONObject("voc") ?: error("墨墨词库中没有找到“$query”")
         val id = URLEncoder.encode(voc.getString("id"), "UTF-8")
         val interpretations = request("interpretations?voc_id=$id").getJSONArray("interpretations")
         val phrases = request("phrases?voc_id=$id").getJSONArray("phrases")
