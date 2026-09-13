@@ -104,7 +104,8 @@ open class KeyDef(
         ) : Behavior()
 
         class Swipe(
-            val action: KeyAction
+            val action: KeyAction,
+            val direction: SwipeDirection
         ) : Behavior()
 
         class DoubleTap(

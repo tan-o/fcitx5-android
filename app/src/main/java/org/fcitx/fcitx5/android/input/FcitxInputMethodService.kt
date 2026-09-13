@@ -516,6 +516,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         currentInputConnection?.commitText("", 1)
     }
 
+    fun deleteAllText() {
+        resetComposingState()
+        currentInputConnection?.withBatchEdit {
+            performContextMenuAction(android.R.id.selectAll)
+            commitText("", 1)
+        }
+        selection.resetTo(0)
+    }
+
     fun sendCombinationKeyEvents(
         keyEventCode: Int,
         alt: Boolean = false,

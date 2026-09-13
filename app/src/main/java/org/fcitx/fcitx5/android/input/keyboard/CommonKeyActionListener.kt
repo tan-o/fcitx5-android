@@ -23,6 +23,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.Backspace
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.BackspaceSwipeState.Stopped
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.CommitAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteSelectionAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteAllAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.FcitxKeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.LangSwitchAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.MoveSelectionAction
@@ -32,6 +33,7 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction.ShowInputMethodPickerAc
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SpaceLongPressAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.SymAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.UnicodeAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.UpSwipeAction
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.switchToNextIME
@@ -160,6 +162,20 @@ class CommonKeyActionListener :
                         }
                     }
                     backspaceSwipeState = Stopped
+                }
+                is DeleteAllAction -> {
+                    backspaceSwipeState = Stopped
+                    service.postFcitxJob {
+                        reset()
+                        service.lifecycleScope.launch { service.deleteAllText() }
+                    }
+                }
+                is UpSwipeAction -> {
+                    val text = UpSwipeSymbols.get(context, action.key)
+                    if (text.isNotEmpty()) service.postFcitxJob {
+                        commitAndReset()
+                        service.lifecycleScope.launch { service.commitText(text) }
+                    }
                 }
                 is PickerSwitchAction -> {
                     // update lastSymbolType only when specified explicitly

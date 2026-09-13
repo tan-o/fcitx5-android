@@ -55,8 +55,6 @@ abstract class BaseKeyboard(
 
     private val popupOnKeyPress by prefs.keyboard.popupOnKeyPress
     private val expandKeypressArea by prefs.keyboard.expandKeypressArea
-    private val swipeSymbolDirection by prefs.keyboard.swipeSymbolDirection
-
     private val spaceSwipeMoveCursor = prefs.keyboard.spaceSwipeMoveCursor
     private val spaceKeys = mutableListOf<KeyView>()
     private val spaceSwipeChangeListener = ManagedPreference.OnChangeListener<Boolean> { _, v ->
@@ -211,20 +209,38 @@ abstract class BaseKeyboard(
                 swipeEnabled = true
                 swipeRepeatEnabled = true
                 swipeThresholdX = selectionSwipeThreshold
-                swipeThresholdY = disabledSwipeThreshold
+                swipeThresholdY = selectionSwipeThreshold
+                var deleteAll = false
                 onGestureListener = OnGestureListener { view, event ->
                     when (event.type) {
+                        GestureType.Down -> {
+                            deleteAll = false
+                            false
+                        }
                         GestureType.Move -> {
-                            val count = event.countX
-                            if (count != 0) {
-                                onAction(KeyAction.MoveSelectionAction(count))
+                            if (event.totalY < 0) {
+                                deleteAll = true
                                 if (hapticOnRepeat) InputFeedbacks.hapticFeedback(view)
                                 true
-                            } else false
+                            } else if (deleteAll) {
+                                true
+                            } else {
+                                val count = event.countX
+                                if (count < 0) {
+                                    onAction(KeyAction.MoveSelectionAction(count))
+                                    if (hapticOnRepeat) InputFeedbacks.hapticFeedback(view)
+                                    true
+                                } else false
+                            }
                         }
                         GestureType.Up -> {
-                            onAction(KeyAction.DeleteSelectionAction(event.totalX))
-                            false
+                            if (deleteAll) {
+                                onAction(KeyAction.DeleteAllAction)
+                                true
+                            } else if (event.totalX < 0) {
+                                onAction(KeyAction.DeleteSelectionAction(event.totalX))
+                                true
+                            } else false
                         }
                         else -> false
                     }
@@ -258,7 +274,7 @@ abstract class BaseKeyboard(
                         onGestureListener = OnGestureListener { view, event ->
                             when (event.type) {
                                 GestureType.Up -> {
-                                    if (!event.consumed && swipeSymbolDirection.checkY(event.totalY)) {
+                                    if (!event.consumed && it.direction.matches(event.totalY)) {
                                         onAction(it.action)
                                         true
                                     } else {
@@ -334,8 +350,12 @@ abstract class BaseKeyboard(
                                         PopupAction.PreviewAction(view.id, it.content, view.bounds)
                                     )
                                     GestureType.Move -> {
-                                        val triggered = swipeSymbolDirection.checkY(event.totalY)
-                                        val text = if (triggered) it.alternative else it.content
+                                        val text = when {
+                                            event.totalY > 0 -> it.alternative
+                                            event.totalY < 0 && def is AlphabetKey ->
+                                                UpSwipeSymbols.get(context, def.character)
+                                            else -> it.content
+                                        }
                                         onPopupAction(
                                             PopupAction.PreviewUpdateAction(view.id, text)
                                         )

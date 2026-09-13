@@ -42,14 +42,14 @@ jobs:
           sudo apt-get install -y extra-cmake-modules gettext
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
+      - name: Test and build app with embedded Rime
+        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
       - name: Verify stable signing key
         run: |
           if [[ -z "$SIGN_KEY_BASE64" || -z "$SIGN_KEY_PWD" || -z "$SIGN_KEY_ALIAS" ]]; then
-            echo "::error::Set SIGN_KEY_BASE64, SIGN_KEY_PWD and SIGN_KEY_ALIAS repository secrets before building."
+            echo "::error::Set SIGN_KEY_BASE64, SIGN_KEY_PWD and SIGN_KEY_ALIAS repository secrets before publishing an APK."
             exit 1
           fi
-      - name: Test and build app with embedded Rime
-        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
       - name: Collect APKs
         # Validate embedded assets before publishing an installable artifact.
         run: |

@@ -165,9 +165,6 @@
     <string name="disable_addon_warn_dep">Отключить %1$s</string>
     <string name="disable_addon_warn_optdep">Отключить некоторые функции в %1$s</string>
     <string name="disable_addon_warn_confirm">Вы уверены, что хотите отключить?</string>
-    <string name="swipe_symbol_behavior">Проведите пальцем, чтобы ввести знаки препинания и цифры</string>
-    <string name="swipe_down">Провести вниз</string>
-    <string name="swipe_up">Провести вверх</string>
     <string name="disabled">Отключено</string>
     <string name="system_default">Системные установки по умолчанию</string>
     <string name="editor_info_inspector">Инспектор EditorInfo</string>
