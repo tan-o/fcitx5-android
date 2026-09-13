@@ -160,6 +160,9 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
 
     override suspend fun triggerQuickPhrase() = withFcitxContext { triggerQuickPhraseInput() }
     override suspend fun triggerUnicode() = withFcitxContext { triggerUnicodeInput() }
+    override suspend fun invokeLua(function: String, argument: String) = withFcitxContext {
+        invokeFcitxLua(function, RawConfig("", argument))
+    }
     private suspend fun setClipboard(string: String, password: Boolean = false) =
         withFcitxContext { setFcitxClipboard(string, password) }
 
@@ -340,6 +343,9 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
 
         @JvmStatic
         external fun triggerUnicodeInput()
+
+        @JvmStatic
+        external fun invokeFcitxLua(function: String, argument: RawConfig): RawConfig?
 
         @JvmStatic
         external fun setFcitxClipboard(string: String, password: Boolean)

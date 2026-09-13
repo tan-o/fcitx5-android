@@ -178,9 +178,15 @@
     <string name="disable_addon_warn_dep">禁用%1$s</string>
     <string name="disable_addon_warn_optdep">禁用%1$s中的某些功能</string>
     <string name="disable_addon_warn_confirm">确定要禁用它吗？</string>
-    <string name="up_swipe_symbols">上划字符</string>
-    <string name="up_swipe_symbols_summary">逐键自定义字母键上划时输入的字符</string>
+    <string name="key_gesture_actions">按键手势动作</string>
+    <string name="key_gesture_actions_summary">逐键自定义上划动作和长按候选</string>
+    <string name="up_swipe_symbols">上划动作</string>
     <string name="up_swipe_key">%1$s 键</string>
+    <string name="long_press_actions">长按候选</string>
+    <string name="long_press_key">%1$s 键候选</string>
+    <string name="long_press_action_summary">每行一个候选</string>
+    <string name="gesture_action_syntax_title">动作格式</string>
+    <string name="gesture_action_syntax">直接填写文本即可输入。也可写“名称=动作”：时间=datetime:yyyy-MM-dd HH:mm；脚本=lua:函数名:参数；快捷短语=fcitx:quickphrase；Unicode=fcitx:unicode；表情=fcitx:emoji；符号=fcitx:symbols；切换输入法=fcitx:next-ime。</string>
     <string name="disabled">禁用</string>
     <string name="system_default">系统默认</string>
     <string name="editor_info_inspector">编辑器信息 (EditorInfo) 检查器</string>

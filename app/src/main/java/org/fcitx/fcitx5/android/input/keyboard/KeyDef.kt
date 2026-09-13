@@ -122,7 +122,9 @@ open class KeyDef(
             data class Preset(val label: String, val transformPunctuation: Boolean = true) :
                 Keyboard()
 
-            class Explicit(val items: Array<String>) : Keyboard()
+            class Explicit(val items: Array<Item>) : Keyboard() {
+                data class Item(val label: String, val action: KeyAction)
+            }
         }
 
         class Menu(val items: Array<Item>) : Popup() {

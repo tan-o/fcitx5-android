@@ -22,6 +22,9 @@ find_package(LibIMEPinyin MODULE)
 find_package(LibIMETable MODULE)
 
 find_package(fcitx5-lua REQUIRED CONFIG)
+get_target_property(FCITX5_LUA_CMAKE_MODULES fcitx5-lua::cmake INTERFACE_INCLUDE_DIRECTORIES)
+list(APPEND CMAKE_MODULE_PATH ${FCITX5_LUA_CMAKE_MODULES})
+find_package(Fcitx5ModuleLuaAddonLoader MODULE)
 find_package(fcitx5-chinese-addons REQUIRED CONFIG)
 
 include("${FCITX_INSTALL_CMAKECONFIG_DIR}/Fcitx5Utils/Fcitx5CompilerSettings.cmake")
@@ -54,6 +57,7 @@ target_link_libraries(native-lib
         Fcitx5::Module::QuickPhrase
         Fcitx5::Module::Unicode
         Fcitx5::Module::Clipboard
+        Fcitx5::Module::LuaAddonLoader
         Boost::headers
         Boost::iostreams
         LibIME::Pinyin

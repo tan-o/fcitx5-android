@@ -178,9 +178,15 @@
     <string name="disable_addon_warn_dep">Disable %1$s</string>
     <string name="disable_addon_warn_optdep">Disable some features in %1$s</string>
     <string name="disable_addon_warn_confirm">Are you sure you want to disable it?</string>
-    <string name="up_swipe_symbols">Up-swipe characters</string>
-    <string name="up_swipe_symbols_summary">Customize the character entered by swiping up on each letter key</string>
+    <string name="key_gesture_actions">Key gesture actions</string>
+    <string name="key_gesture_actions_summary">Customize up-swipe actions and long-press choices for every letter key</string>
+    <string name="up_swipe_symbols">Up-swipe actions</string>
     <string name="up_swipe_key">%1$s key</string>
+    <string name="long_press_actions">Long-press choices</string>
+    <string name="long_press_key">%1$s key choices</string>
+    <string name="long_press_action_summary">One choice per line</string>
+    <string name="gesture_action_syntax_title">Action format</string>
+    <string name="gesture_action_syntax">Plain text inserts itself. Optional label=action forms: Time=datetime:yyyy-MM-dd HH:mm; Script=lua:function:argument; Quick phrase=fcitx:quickphrase; Unicode=fcitx:unicode; Emoji=fcitx:emoji; Symbols=fcitx:symbols; Next input method=fcitx:next-ime.</string>
     <string name="disabled">Disabled</string>
     <string name="system_default">System default</string>
     <string name="editor_info_inspector">EditorInfo Inspector</string>

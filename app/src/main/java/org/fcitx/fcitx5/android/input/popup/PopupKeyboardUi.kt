@@ -39,8 +39,7 @@ import kotlin.math.roundToInt
  * @param keyHeight key height in popup keyboard
  * @param popupHeight popup preview view height. Used to transform gesture coordinate from
  * trigger view to popup keyboard view. See [offsetX] and [offsetY].
- * @param keys character to commit when triggered
- * @param labels symbols to show on keys
+ * @param items labels and actions shown on keys
  */
 class PopupKeyboardUi(
     override val ctx: Context,
@@ -52,8 +51,7 @@ class PopupKeyboardUi(
     private val keyWidth: Int,
     private val keyHeight: Int,
     private val popupHeight: Int,
-    private val keys: Array<String>,
-    private val labels: Array<String>
+    private val items: Array<KeyDef.Popup.Keyboard.Explicit.Item>
 ) : PopupContainerUi(ctx, theme, outerBounds, triggerBounds, onDismissSelf) {
 
     class PopupKeyUi(override val ctx: Context, val theme: Theme, val text: String) : Ui {
@@ -90,7 +88,7 @@ class PopupKeyboardUi(
     private val focusColumn: Int
 
     init {
-        val keyCount: Float = keys.size.toFloat()
+        val keyCount: Float = items.size.toFloat()
         rowCount = ceil(keyCount / 5).toInt()
         columnCount = (keyCount / rowCount).roundToInt()
 
@@ -151,8 +149,8 @@ class PopupKeyboardUi(
 
     private var focusedIndex = keyOrders[focusRow][focusColumn]
 
-    private val keyUis = labels.map {
-        PopupKeyUi(ctx, theme, it)
+    private val keyUis = items.map {
+        PopupKeyUi(ctx, theme, it.label)
     }
 
     init {
@@ -218,8 +216,7 @@ class PopupKeyboardUi(
     }
 
     override fun onTrigger(): KeyAction? {
-        val key = keys.getOrNull(focusedIndex) ?: return null
-        return KeyAction.FcitxKeyAction(key)
+        return items.getOrNull(focusedIndex)?.action
     }
 
 }

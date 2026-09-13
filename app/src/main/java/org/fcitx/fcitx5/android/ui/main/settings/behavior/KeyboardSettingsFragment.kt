@@ -15,8 +15,8 @@ import org.fcitx.fcitx5.android.utils.navigateWithAnim
 class KeyboardSettingsFragment : ManagedPreferenceFragment(AppPrefs.getInstance().keyboard) {
     override fun onPreferenceUiCreated(screen: PreferenceScreen) {
         screen.addPreference(
-            R.string.up_swipe_symbols,
-            R.string.up_swipe_symbols_summary
+            R.string.key_gesture_actions,
+            R.string.key_gesture_actions_summary
         ) { navigateWithAnim(SettingsRoute.UpSwipeKeys) }
     }
 }

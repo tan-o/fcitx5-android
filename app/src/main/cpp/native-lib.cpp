@@ -32,6 +32,7 @@
 #include <quickphrase_public.h>
 #include <unicode_public.h>
 #include <clipboard_public.h>
+#include <luaaddon_public.h>
 
 #include <libime/pinyin/pinyindictionary.h>
 #include <libime/table/tablebaseddictionary.h>
@@ -361,6 +362,16 @@ public:
         auto *ic = p_frontend->call<fcitx::IAndroidFrontend::activeInputContext>();
         if (!ic) return;
         p_unicode->call<fcitx::IUnicode::trigger>(ic);
+    }
+
+    std::unique_ptr<fcitx::RawConfig> invokeLua(const std::string &function,
+                                                const fcitx::RawConfig &argument) {
+        auto *ic = p_frontend->call<fcitx::IAndroidFrontend::activeInputContext>();
+        if (!ic) return nullptr;
+        auto *imeapi = p_instance->addonManager().addon("imeapi");
+        if (!imeapi) return nullptr;
+        return std::make_unique<fcitx::RawConfig>(
+                imeapi->call<fcitx::ILuaAddon::invokeLuaFunction>(ic, function, argument));
     }
 
     void setClipboard(const std::string &string, bool password) {
@@ -990,6 +1001,16 @@ JNIEXPORT void JNICALL
 Java_org_fcitx_fcitx5_android_core_Fcitx_triggerUnicodeInput(JNIEnv *env, jclass clazz) {
     RETURN_IF_NOT_RUNNING
     Fcitx::Instance().triggerUnicode();
+}
+
+extern "C"
+JNIEXPORT jobject JNICALL
+Java_org_fcitx_fcitx5_android_core_Fcitx_invokeFcitxLua(JNIEnv *env, jclass clazz,
+                                                        jstring function, jobject argument) {
+    RETURN_VALUE_IF_NOT_RUNNING(nullptr)
+    auto rawArgument = jobjectToRawConfig(env, argument);
+    auto result = Fcitx::Instance().invokeLua(CString(env, function), rawArgument);
+    return result ? fcitxRawConfigToJObject(env, *result) : nullptr;
 }
 
 extern "C"

@@ -227,7 +227,7 @@ sealed class SettingsRoute : Parcelable {
                 label = ctx.getString(R.string.virtual_keyboard)
             }
             fragment<UpSwipeSettingsFragment, UpSwipeKeys> {
-                label = ctx.getString(R.string.up_swipe_symbols)
+                label = ctx.getString(R.string.key_gesture_actions)
             }
             fragment<CandidatesSettingsFragment, CandidatesWindow> {
                 label = ctx.getString(R.string.candidates_window)

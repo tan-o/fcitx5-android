@@ -89,6 +89,7 @@ interface FcitxAPI {
 
     suspend fun triggerQuickPhrase()
     suspend fun triggerUnicode()
+    suspend fun invokeLua(function: String, argument: String = ""): RawConfig?
 
     suspend fun focus(focus: Boolean = true)
     suspend fun focusOutIn()

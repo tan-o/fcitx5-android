@@ -19,6 +19,7 @@ import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
+import org.fcitx.fcitx5.android.input.keyboard.KeyGestureActions
 import org.mechdancer.dependency.Dependent
 import org.mechdancer.dependency.UniqueComponent
 import org.mechdancer.dependency.manager.ManagedHandler
@@ -116,21 +117,30 @@ class PopupComponent :
     }
 
     private fun showKeyboard(viewId: Int, keyboard: KeyDef.Popup.Keyboard, bounds: Rect) {
-        var keys: Array<String>
-        var labels: Array<String>
+        val items: Array<KeyDef.Popup.Keyboard.Explicit.Item>
         when (keyboard) {
             is KeyDef.Popup.Keyboard.Preset -> {
-                val preset = PopupPreset[keyboard.label] ?: return
-                keys = preset
-                labels = if (keyboard.transformPunctuation && punctuation.enabled) {
-                    Array(keys.size) { punctuation.transform(keys[it]) }
-                } else keys
+                val configured = if (keyboard.label.singleOrNull()?.isLetter() == true) {
+                    KeyGestureActions.longPress(context, keyboard.label)
+                } else null
+                items = if (configured != null) {
+                    configured.map { KeyDef.Popup.Keyboard.Explicit.Item(it.label, it.action) }.toTypedArray()
+                } else {
+                    val preset = PopupPreset[keyboard.label] ?: return
+                    Array(preset.size) { index ->
+                        val key = preset[index]
+                        val label = if (keyboard.transformPunctuation && punctuation.enabled) {
+                            punctuation.transform(key)
+                        } else key
+                        KeyDef.Popup.Keyboard.Explicit.Item(label, KeyAction.FcitxKeyAction(key))
+                    }
+                }
             }
             is KeyDef.Popup.Keyboard.Explicit -> {
-                keys = keyboard.items
-                labels = keyboard.items
+                items = keyboard.items
             }
         }
+        if (items.isEmpty()) return
         // clear popup preview text         OR create empty popup preview
         showingEntryUi[viewId]?.setText("") ?: showPopup(viewId, "", bounds)
         val keyboardUi = PopupKeyboardUi(
@@ -144,8 +154,7 @@ class PopupComponent :
             popupKeyHeight,
             // position popup keyboard higher, because of [^1]
             popupHeight + keyBottomMargin,
-            keys,
-            labels
+            items
         )
         showPopupContainer(viewId, keyboardUi)
     }

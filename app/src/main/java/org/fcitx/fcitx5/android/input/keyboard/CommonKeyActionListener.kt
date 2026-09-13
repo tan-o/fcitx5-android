@@ -24,8 +24,10 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.Backspace
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.CommitAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteSelectionAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteAllAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DateTimeAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.FcitxKeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.LangSwitchAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.LuaAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.MoveSelectionAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.PickerSwitchAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.QuickPhraseAction
@@ -42,6 +44,8 @@ import org.mechdancer.dependency.UniqueComponent
 import org.mechdancer.dependency.manager.ManagedHandler
 import org.mechdancer.dependency.manager.managedHandler
 import org.mechdancer.dependency.manager.must
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 
 class CommonKeyActionListener :
     UniqueComponent<CommonKeyActionListener>(), Dependent, ManagedHandler by managedHandler() {
@@ -89,9 +93,8 @@ class CommonKeyActionListener :
         }
     }
 
-    val listener by lazy {
-        KeyActionListener { action, _ ->
-            when (action) {
+    private fun handleAction(action: KeyAction) {
+        when (action) {
                 is FcitxKeyAction -> service.postFcitxJob {
                     sendKey(action.act, action.states.states, action.code)
                 }
@@ -101,6 +104,19 @@ class CommonKeyActionListener :
                 is CommitAction -> service.postFcitxJob {
                     commitAndReset()
                     service.lifecycleScope.launch { service.commitText(action.text) }
+                }
+                is DateTimeAction -> {
+                    val text = runCatching {
+                        DateTimeFormatter.ofPattern(action.pattern).format(ZonedDateTime.now())
+                    }.getOrNull() ?: return
+                    handleAction(CommitAction(text))
+                }
+                is LuaAction -> service.postFcitxJob {
+                    commitAndReset()
+                    val text = invokeLua(action.function, action.argument)?.value.orEmpty()
+                    if (text.isNotEmpty()) {
+                        service.lifecycleScope.launch { service.commitText(text) }
+                    }
                 }
                 is QuickPhraseAction -> service.postFcitxJob {
                     commitAndReset()
@@ -171,11 +187,7 @@ class CommonKeyActionListener :
                     }
                 }
                 is UpSwipeAction -> {
-                    val text = UpSwipeSymbols.get(context, action.key)
-                    if (text.isNotEmpty()) service.postFcitxJob {
-                        commitAndReset()
-                        service.lifecycleScope.launch { service.commitText(text) }
-                    }
+                    KeyGestureActions.upSwipe(context, action.key)?.action?.let(::handleAction)
                 }
                 is PickerSwitchAction -> {
                     // update lastSymbolType only when specified explicitly
@@ -200,6 +212,9 @@ class CommonKeyActionListener :
                 }
                 else -> {}
             }
-        }
+    }
+
+    val listener by lazy {
+        KeyActionListener { action, _ -> handleAction(action) }
     }
 }

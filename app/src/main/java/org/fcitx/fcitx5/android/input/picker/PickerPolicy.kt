@@ -6,6 +6,7 @@
 package org.fcitx.fcitx5.android.input.picker
 
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyDef
 import org.fcitx.fcitx5.android.input.popup.EmojiModifier
 
@@ -68,7 +69,10 @@ class EmojiPickerPolicy : PickerPolicy {
 
     override fun popup(raw: String): KeyDef.Popup.Keyboard? {
         val items = EmojiModifier.produceSkinTones(raw, defaultSkinTone) ?: return null
-        return KeyDef.Popup.Keyboard.Explicit(items)
+        return KeyDef.Popup.Keyboard.Explicit(
+            items.map { KeyDef.Popup.Keyboard.Explicit.Item(it, KeyAction.FcitxKeyAction(it)) }
+                .toTypedArray()
+        )
     }
 
     override fun invalidateKey(): Prefs = prefs

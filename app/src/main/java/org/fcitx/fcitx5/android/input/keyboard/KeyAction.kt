@@ -21,6 +21,10 @@ sealed class KeyAction {
 
     data class CommitAction(val text: String) : KeyAction()
 
+    data class DateTimeAction(val pattern: String) : KeyAction()
+
+    data class LuaAction(val function: String, val argument: String = "") : KeyAction()
+
     data class CapsAction(val lock: Boolean) : KeyAction()
 
     data object QuickPhraseAction : KeyAction()

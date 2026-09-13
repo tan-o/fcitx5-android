@@ -353,7 +353,7 @@ abstract class BaseKeyboard(
                                         val text = when {
                                             event.totalY > 0 -> it.alternative
                                             event.totalY < 0 && def is AlphabetKey ->
-                                                UpSwipeSymbols.get(context, def.character)
+                                                KeyGestureActions.upSwipe(context, def.character)?.label.orEmpty()
                                             else -> it.content
                                         }
                                         onPopupAction(
