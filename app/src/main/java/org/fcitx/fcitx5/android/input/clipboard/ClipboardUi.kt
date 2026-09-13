@@ -162,8 +162,8 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
                     setColor(if (value == selected) theme.genericActiveBackgroundColor else theme.altKeyBackgroundColor)
                 }
                 setOnClickListener { onSelect(value) }
-            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(28)).apply {
-                marginStart = dp(4)
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, ctx.dp(28)).apply {
+                marginStart = ctx.dp(4)
             })
         }
         categoryScroll.visibility = if (!searching && labels.isNotEmpty()) View.VISIBLE else View.GONE
