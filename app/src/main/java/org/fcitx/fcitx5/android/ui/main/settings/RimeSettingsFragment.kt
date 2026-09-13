@@ -10,7 +10,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.work.WorkManager
-import androidx.work.getWorkInfosForUniqueWorkFlow
 import android.app.AlertDialog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
