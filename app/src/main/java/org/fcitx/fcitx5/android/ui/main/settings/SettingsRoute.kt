@@ -97,9 +97,6 @@ sealed class SettingsRoute : Parcelable {
     data object LuaScripts : SettingsRoute()
 
     @Serializable
-    data object LuaScripts : SettingsRoute()
-
-    @Serializable
     data object Rime : SettingsRoute()
 
     @Serializable
@@ -204,7 +201,6 @@ sealed class SettingsRoute : Parcelable {
 
             fragment<RimeSettingsFragment, Rime> { label = "Rime" }
             fragment<DeepSeekSettingsFragment, DeepSeekTranslation> { label = "DeepSeek 翻译" }
-            fragment<LuaScriptsFragment, LuaScripts> { label = "Lua 脚本" }
             fragment<LuaScriptsFragment, LuaScripts> { label = "Lua 脚本" }
             fragment<MainFragment, Index> {
                 label = ctx.getString(R.string.app_name)

@@ -70,9 +70,6 @@ class MainFragment : PaddingPreferenceFragment() {
                 addPreference("Rime", "方案仓库、自定义补丁与万象模型", R.drawable.ic_baseline_language_24) {
                     navigateWithAnim(SettingsRoute.Rime)
                 }
-                addPreference("Lua 脚本", "编辑按键手势可调用的 imeapi 扩展", R.drawable.ic_baseline_code_24) {
-                    navigateWithAnim(SettingsRoute.LuaScripts)
-                }
                 addPreference("Lua 脚本", "编辑上划和长按动作调用的脚本", R.drawable.ic_baseline_code_24) {
                     navigateWithAnim(SettingsRoute.LuaScripts)
                 }
