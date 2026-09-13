@@ -623,7 +623,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onComputeInsets(outInsets: Insets) {
         if (inputDeviceMgr.isVirtualKeyboard) {
-            inputView?.keyboardView?.getLocationInWindow(inputViewLocation)
+            inputView?.visibleInputTop?.getLocationInWindow(inputViewLocation)
             outInsets.apply {
                 contentTopInsets = inputViewLocation[1]
                 visibleTopInsets = inputViewLocation[1]
@@ -643,6 +643,11 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     // always show InputView since we delegate CandidatesView's visibility to it
     @SuppressLint("MissingSuperCall")
     override fun onEvaluateInputViewShown() = true
+
+    fun requestInputLayout() {
+        inputView?.requestLayout()
+        contentView.requestLayout()
+    }
 
     fun superEvaluateInputViewShown() = super.onEvaluateInputViewShown()
 

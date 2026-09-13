@@ -31,6 +31,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
@@ -102,8 +103,6 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
     private var searchQuery = ""
     private var selectedTag: String? = null
-    private var tagEntry: ClipboardEntry? = null
-
     private fun submitEntries(pagingSourceFactory: () -> PagingSource<Int, ClipboardEntry>) {
         adapterSubmitJob?.cancel()
         val pager = Pager(PagingConfig(pageSize = 16), pagingSourceFactory = pagingSourceFactory)
@@ -113,7 +112,6 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     }
 
     private fun setSearching(on: Boolean) {
-        tagEntry = null
         inSearchMode = on
         searchQuery = ""
         ui.setSearchMode(on)
@@ -127,12 +125,8 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
     private fun updateSearchQuery(query: String) {
         searchQuery = query
-        if (tagEntry != null) {
-            ui.updateTagQuery(query)
-        } else {
-            ui.updateSearchQuery(query)
-            submitSearchEntries(query)
-        }
+        ui.updateSearchQuery(query)
+        submitSearchEntries(query)
     }
 
     private fun submitSearchEntries(query: String) {
@@ -161,10 +155,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
                     }
                 }
                 FcitxKeyMapping.FcitxKey_space -> updateSearchQuery("$searchQuery ")
-                FcitxKeyMapping.FcitxKey_Return -> {
-                    tagEntry?.let { ClipboardTags.set(it.id, searchQuery) }
-                    setSearching(false)
-                }
+                FcitxKeyMapping.FcitxKey_Return -> setSearching(false)
                 in 0xffb0..0xffb9 -> updateSearchQuery(searchQuery + (sym - 0xffb0))
                 0xffab -> updateSearchQuery("$searchQuery+")
                 0xffad -> updateSearchQuery("$searchQuery-")
@@ -197,7 +188,10 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             ClipboardTab.Pinned -> {
                 adapterSubmitJob?.cancel()
                 adapterSubmitJob = service.lifecycleScope.launch {
-                    ClipboardManager.observeEntries().collectLatest { entries ->
+                    combine(
+                        ClipboardManager.observeEntries(),
+                        ClipboardTags.observeChanges()
+                    ) { entries, _ -> entries }.collectLatest { entries ->
                         val pinned = entries.filter(ClipboardEntry::pinned)
                         val labels = ClipboardTags.labels(pinned)
                         if (selectedTag !in labels) selectedTag = null
@@ -219,11 +213,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     }
 
     private fun promptTag(entry: ClipboardEntry) {
-        tagEntry = entry
-        inSearchMode = true
-        searchQuery = ClipboardTags.customLabel(entry)
-        ui.setSearchMode(true)
-        ui.updateTagQuery(searchQuery)
+        AppUtil.launchClipboardTag(context, entry.id)
     }
 
     private val adapter: ClipboardAdapter by lazy {

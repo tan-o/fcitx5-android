@@ -58,6 +58,14 @@ object AppUtil {
         }
     }
 
+    fun launchClipboardTag(context: Context, id: Int) {
+        context.startActivity<ClipboardEditActivity> {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra(ClipboardEditActivity.ENTRY_ID, id)
+            putExtra(ClipboardEditActivity.EDIT_TAG, true)
+        }
+    }
+
     fun exit() {
         exitProcess(0)
     }

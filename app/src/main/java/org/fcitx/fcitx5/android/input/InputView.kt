@@ -202,6 +202,10 @@ class InputView(
     }
 
     val keyboardView: View
+    val topPanel: View
+
+    val visibleInputTop: View
+        get() = if (topPanel.visibility == View.VISIBLE) topPanel else keyboardView
 
     init {
         // MUST call before any operation
@@ -263,7 +267,7 @@ class InputView(
 
         updateKeyboardSize()
 
-        val topPanel = keyboardWindow.topPanel.apply { id = View.generateViewId() }
+        topPanel = keyboardWindow.topPanel.apply { id = View.generateViewId() }
         add(topPanel, lParams(matchParent, wrapContent) {
             above(keyboardView)
             centerHorizontally()

@@ -177,14 +177,6 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
         searchBar.text = query.ifEmpty { ctx.getString(R.string.clipboard_search_hint) }
     }
 
-    fun updateTagQuery(query: String) {
-        searchBar.text = if (query.isEmpty()) {
-            ctx.getString(R.string.clipboard_tag_hint)
-        } else {
-            ctx.getString(R.string.clipboard_tag_value, query)
-        }
-    }
-
     private fun setDeleteButtonShown(enabled: Boolean) {
         deleteAllButton.visibility = if (enabled) View.VISIBLE else View.INVISIBLE
     }

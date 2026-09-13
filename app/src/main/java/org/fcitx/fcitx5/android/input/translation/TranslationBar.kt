@@ -83,6 +83,7 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         result.text = text
         results.visibility = View.VISIBLE
         root.requestLayout()
+        service.requestInputLayout()
     }
     val root = LinearLayout(service).apply {
         orientation = LinearLayout.VERTICAL
@@ -95,6 +96,7 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         source.doAfterTextChanged {
             results.visibility = View.GONE
             root.requestLayout()
+            service.requestInputLayout()
         }
     }
     fun toggle(lookup: Boolean = false) {
@@ -111,6 +113,7 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         translate.isEnabled = true
         results.visibility = View.GONE
         root.visibility = View.VISIBLE
+        service.requestInputLayout()
         service.closeTranslation = { close() }
         source.setText("")
         source.requestFocus()
@@ -180,6 +183,7 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         balanceJob?.cancel()
         service.closeTranslation = null
         root.visibility = View.GONE
+        service.requestInputLayout()
         val previous = target
         target = null
         service.lifecycleScope.launch {

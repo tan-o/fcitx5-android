@@ -5,11 +5,13 @@
 package org.fcitx.fcitx5.android.data.clipboard
 
 import android.content.Context
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.utils.appContext
 
 /** User labels for pinned entries, with deterministic labels for common structured text. */
 object ClipboardTags {
+    private val changes = MutableStateFlow(0)
     private val preferences by lazy {
         appContext.getSharedPreferences("clipboard_tags", Context.MODE_PRIVATE)
     }
@@ -39,7 +41,10 @@ object ClipboardTags {
         preferences.edit().apply {
             if (value.isEmpty()) remove(id.toString()) else putString(id.toString(), value)
         }.apply()
+        changes.value += 1
     }
+
+    fun observeChanges() = changes
 
     fun labels(entries: List<ClipboardEntry>): List<String> {
         val labels = entries.map(::label).toSet()

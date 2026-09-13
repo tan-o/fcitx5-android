@@ -8,7 +8,9 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
+import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +18,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
+import org.fcitx.fcitx5.android.data.clipboard.ClipboardTags
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.databinding.ActivityClipboardEditBinding
 import org.fcitx.fcitx5.android.utils.clipboardManager
@@ -27,13 +30,15 @@ class ClipboardEditActivity : Activity() {
     private val scope: CoroutineScope = MainScope()
 
     private lateinit var editText: EditText
+    private lateinit var binding: ActivityClipboardEditBinding
 
     private var entryId: Int = -1
+    private var editingTag = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.attributes.gravity = Gravity.TOP
-        val binding = ActivityClipboardEditBinding.inflate(layoutInflater).apply {
+        binding = ActivityClipboardEditBinding.inflate(layoutInflater).apply {
             editText = clipboardEditText
             clipboardEditCancel.setOnClickListener { finish() }
             clipboardEditOk.setOnClickListener { finishEditing() }
@@ -47,17 +52,22 @@ class ClipboardEditActivity : Activity() {
     private fun finishEditing(copy: Boolean = false) {
         val str = editText.str
         scope.launch {
-            ClipboardManager.updateText(entryId, str)
-            if (copy) {
-                clipboardManager.setPrimaryClip(ClipData.newPlainText("", str))
+            if (editingTag) {
+                ClipboardTags.set(entryId, str)
+            } else {
+                ClipboardManager.updateText(entryId, str)
+                if (copy) {
+                    clipboardManager.setPrimaryClip(ClipData.newPlainText("", str))
+                }
             }
+            finish()
         }
-        finish()
     }
 
     private fun setEntry(entry: ClipboardEntry) {
         entryId = entry.id
-        editText.setText(entry.text)
+        editText.setText(if (editingTag) ClipboardTags.customLabel(entry) else entry.text)
+        editText.setSelection(editText.text.length)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -66,6 +76,16 @@ class ClipboardEditActivity : Activity() {
     }
 
     private fun processIntent(intent: Intent) {
+        editingTag = intent.getBooleanExtra(EDIT_TAG, false)
+        title = getString(if (editingTag) R.string.clipboard_tag_title else R.string.edit_clipboard)
+        editText.apply {
+            hint = getString(if (editingTag) R.string.clipboard_tag_hint else R.string.clipboard_edit_text_hint)
+            minLines = if (editingTag) 1 else 4
+            maxLines = if (editingTag) 1 else 8
+            inputType = InputType.TYPE_CLASS_TEXT or
+                if (editingTag) 0 else InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        }
+        binding.clipboardEditCopy.visibility = if (editingTag) View.GONE else View.VISIBLE
         scope.launch {
             intent.run {
                 if (getBooleanExtra(LAST_ENTRY, false)) {
@@ -90,5 +110,6 @@ class ClipboardEditActivity : Activity() {
     companion object {
         const val ENTRY_ID = "id"
         const val LAST_ENTRY = "last_entry"
+        const val EDIT_TAG = "edit_tag"
     }
 }

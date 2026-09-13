@@ -52,11 +52,12 @@ class ButtonsBarUi(override val ctx: Context, private val theme: Theme) : Ui {
         contentDescription = "DeepSeek 翻译"
     }
 
-    val moreButton = toolButton(R.drawable.ic_baseline_more_horiz_24).apply {
-        contentDescription = ctx.getString(R.string.status_area)
-    }
     val lookupButton = toolButton(R.drawable.ic_baseline_search_24).apply {
         contentDescription = "墨墨查词"
+    }
+
+    val moreButton = toolButton(R.drawable.ic_baseline_more_horiz_24).apply {
+        contentDescription = ctx.getString(R.string.status_area)
     }
 
 }
