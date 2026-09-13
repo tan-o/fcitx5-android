@@ -1,6 +1,8 @@
 package org.fcitx.fcitx5.android.input.history
 
 import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 
 /** Keeps only the most recent committed phrase and its actual displayed spelling. */
@@ -32,8 +34,10 @@ class PinyinReconversion(private val service: FcitxInputMethodService) {
         }
         service.postFcitxJob {
             if (!isEmpty()) return@postFcitxJob
-            if (service.currentInputConnection !== ic || ic.getTextBeforeCursor(text.length, 0)?.toString() != text) return@postFcitxJob
-            if (!ic.deleteSurroundingText(text.length, 0)) return@postFcitxJob
+            val deleted = withContext(Dispatchers.Main.immediate) {
+                service.deleteCommittedTextForReconversion(ic, text)
+            }
+            if (!deleted) return@postFcitxJob
             committed = ""
             spelling = ""
             raw.forEach { sendKey(it) }

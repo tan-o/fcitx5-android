@@ -11,6 +11,8 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.text.TextUtils
 import android.view.View
+import android.view.Gravity
+import android.widget.LinearLayout
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.keyboard.CustomGestureView
@@ -42,6 +44,19 @@ class ClipboardEntryUi(override val ctx: Context, private val theme: Theme, radi
         setTextColor(theme.keyTextColor)
     }
 
+    private val tagView = textView {
+        textSize = 10f
+        gravity = Gravity.END
+        setTextColor(theme.altKeyTextColor)
+        setPaddingDp(8, 3, 8, 0)
+    }
+
+    private val content = LinearLayout(ctx).apply {
+        orientation = LinearLayout.VERTICAL
+        addView(tagView, LinearLayout.LayoutParams(matchParent, wrapContent))
+        addView(textView, LinearLayout.LayoutParams(matchParent, wrapContent))
+    }
+
     val pin = imageView {
         imageDrawable = drawable(R.drawable.ic_baseline_push_pin_24)!!.apply {
             setTint(theme.altKeyTextColor)
@@ -50,7 +65,7 @@ class ClipboardEntryUi(override val ctx: Context, private val theme: Theme, radi
     }
 
     val layout = constraintLayout {
-        add(textView, lParams(matchParent, wrapContent) {
+        add(content, lParams(matchParent, wrapContent) {
             centerVertically()
         })
         add(pin, lParams(dp(12), dp(12)) {
@@ -76,8 +91,10 @@ class ClipboardEntryUi(override val ctx: Context, private val theme: Theme, radi
         add(layout, lParams(matchParent, matchParent))
     }
 
-    fun setEntry(text: String, pinned: Boolean) {
+    fun setEntry(text: String, pinned: Boolean, tag: String = "") {
         textView.text = text
+        tagView.text = tag
+        tagView.visibility = if (tag.isEmpty()) View.GONE else View.VISIBLE
         pin.visibility = if (pinned) View.VISIBLE else View.GONE
     }
 }

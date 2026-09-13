@@ -9,6 +9,9 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
+import android.widget.TextView
+import android.graphics.drawable.GradientDrawable
 import android.widget.ViewAnimator
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -60,6 +63,16 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     val tabsUi = ClipboardTabsUi(ctx, theme)
 
+    private val categoryRow = LinearLayout(ctx).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+    }
+    private val categoryScroll = HorizontalScrollView(ctx).apply {
+        isHorizontalScrollBarEnabled = false
+        addView(categoryRow, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, matchParent))
+        visibility = View.GONE
+    }
+
     val searchBar = textView {
         textSize = 14f
         isSingleLine = true
@@ -99,6 +112,7 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     private val content = verticalLayout {
         addView(tabsUi.root, LinearLayout.LayoutParams(matchParent, dp(36)))
+        addView(categoryScroll, LinearLayout.LayoutParams(matchParent, dp(34)))
         addView(searchBar, LinearLayout.LayoutParams(matchParent, dp(36)))
         addView(viewAnimator, LinearLayout.LayoutParams(matchParent, 0, 1f))
         addView(keyboardContainer, LinearLayout.LayoutParams(matchParent, 0, 1.6f))
@@ -127,13 +141,48 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
     fun setSearchMode(on: Boolean) {
         searching = on
         tabsUi.root.visibility = if (on) View.GONE else View.VISIBLE
+        if (on) categoryScroll.visibility = View.GONE
         searchBar.visibility = if (on) View.VISIBLE else View.GONE
         keyboardContainer.visibility = if (on) View.VISIBLE else View.GONE
         if (on) switchSearchKeyboard(TextKeyboard.Name)
     }
 
+    fun showCategories(labels: List<String>, selected: String?, onSelect: (String?) -> Unit) {
+        categoryRow.removeAllViews()
+        val values = listOf<String?>(null) + labels
+        values.forEach { value ->
+            categoryRow.addView(TextView(ctx).apply {
+                text = value ?: ctx.getString(R.string.clipboard_tag_all)
+                textSize = 12f
+                gravity = Gravity.CENTER
+                setTextColor(if (value == selected) theme.genericActiveForegroundColor else theme.keyTextColor)
+                setPadding(dp(12), 0, dp(12), 0)
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(14).toFloat()
+                    setColor(if (value == selected) theme.genericActiveBackgroundColor else theme.altKeyBackgroundColor)
+                }
+                setOnClickListener { onSelect(value) }
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(28)).apply {
+                marginStart = dp(4)
+            })
+        }
+        categoryScroll.visibility = if (!searching && labels.isNotEmpty()) View.VISIBLE else View.GONE
+    }
+
+    fun hideCategories() {
+        categoryScroll.visibility = View.GONE
+    }
+
     fun updateSearchQuery(query: String) {
         searchBar.text = query.ifEmpty { ctx.getString(R.string.clipboard_search_hint) }
+    }
+
+    fun updateTagQuery(query: String) {
+        searchBar.text = if (query.isEmpty()) {
+            ctx.getString(R.string.clipboard_tag_hint)
+        } else {
+            ctx.getString(R.string.clipboard_tag_value, query)
+        }
     }
 
     private fun setDeleteButtonShown(enabled: Boolean) {

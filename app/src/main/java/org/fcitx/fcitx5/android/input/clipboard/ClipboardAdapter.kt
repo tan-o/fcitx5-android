@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
+import org.fcitx.fcitx5.android.data.clipboard.ClipboardTags
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.utils.DeviceUtil
 import org.fcitx.fcitx5.android.utils.item
@@ -91,7 +92,11 @@ abstract class ClipboardAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val entry = getItem(position) ?: return
         with(holder.entryUi) {
-            setEntry(excerptText(entry.text, entry.sensitive && maskSensitive), entry.pinned)
+            setEntry(
+                excerptText(entry.text, entry.sensitive && maskSensitive),
+                entry.pinned,
+                if (entry.pinned) ClipboardTags.label(entry) else ""
+            )
             root.setOnClickListener {
                 onPaste(entry)
             }
@@ -102,6 +107,10 @@ abstract class ClipboardAdapter(
                 if (entry.pinned) {
                     menu.item(R.string.unpin, R.drawable.ic_outline_push_pin_24, iconTint) {
                         onUnpin(entry.id)
+                    }
+                    menu.add(R.string.clipboard_tag).setOnMenuItemClickListener {
+                        onTag(entry)
+                        true
                     }
                 } else {
                     menu.item(R.string.pin, R.drawable.ic_baseline_push_pin_24, iconTint) {
@@ -145,6 +154,8 @@ abstract class ClipboardAdapter(
     abstract fun onUnpin(id: Int)
 
     abstract fun onEdit(id: Int)
+
+    abstract fun onTag(entry: ClipboardEntry)
 
     abstract fun onShare(entry: ClipboardEntry)
 

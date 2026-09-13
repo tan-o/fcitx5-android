@@ -7,8 +7,9 @@ package org.fcitx.fcitx5.android.data.handwriting
 import org.fcitx.fcitx5.android.utils.appContext
 
 /**
- * All recorded readings of each of the 8105 chars of 通用规范汉字表, used to
- * annotate handwriting candidates. Data from mozillazg/pinyin-data.
+ * All recorded readings for the common Simplified and Traditional Chinese
+ * characters used to annotate handwriting candidates. Data from
+ * mozillazg/pinyin-data.
  */
 object HandwritingPinyin {
 

@@ -29,6 +29,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestionsRequest
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.view.inputmethod.InputMethodSubtype
+import android.view.inputmethod.InputConnection
 import android.widget.FrameLayout
 import android.widget.inline.InlinePresentationSpec
 import androidx.annotation.Keep
@@ -124,6 +125,19 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     val currentInputSelection: CursorRange
         get() = selection.latest
+
+    /** Delete a just-committed phrase while keeping the cursor tracker in sync. */
+    fun deleteCommittedTextForReconversion(connection: InputConnection, text: String): Boolean {
+        if (currentInputConnection !== connection || text.isEmpty() ||
+            !connection.getSelectedText(0).isNullOrEmpty() ||
+            connection.getTextBeforeCursor(text.length, 0)?.toString() != text) return false
+        val cursor = selection.latest.start
+        if (cursor < text.length) return false
+        selection.predict(cursor - text.length)
+        if (connection.deleteSurroundingText(text.length, 0)) return true
+        selection.resetTo(cursor)
+        return false
+    }
 
     private val composing = CursorRange()
     private var composingText = FormattedText.Empty

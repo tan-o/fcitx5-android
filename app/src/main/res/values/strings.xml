@@ -61,6 +61,11 @@
     <string name="pin">Pin</string>
     <string name="unpin">Unpin</string>
     <string name="delete">Delete</string>
+    <string name="clipboard_tag">Label</string>
+    <string name="clipboard_tag_title">Pinned item label</string>
+    <string name="clipboard_tag_hint">Leave empty to categorize automatically</string>
+    <string name="clipboard_tag_value">Label: %1$s</string>
+    <string name="clipboard_tag_all">All</string>
     <string name="clipboard">Clipboard</string>
     <string name="candidate_filter_none">All</string>
     <string name="candidate_filter_radical">Radical · first 500</string>

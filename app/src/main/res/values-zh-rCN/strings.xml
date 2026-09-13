@@ -61,6 +61,11 @@
     <string name="pin">置顶</string>
     <string name="unpin">取消置顶</string>
     <string name="delete">删除</string>
+    <string name="clipboard_tag">标签</string>
+    <string name="clipboard_tag_title">固定内容标签</string>
+    <string name="clipboard_tag_hint">留空则自动分类（电话、邮箱、链接或其他）</string>
+    <string name="clipboard_tag_value">标签：%1$s</string>
+    <string name="clipboard_tag_all">全部</string>
     <string name="clipboard">剪贴板</string>
     <string name="candidate_filter_none">全部</string>
     <string name="candidate_filter_radical">部首·前500项</string>

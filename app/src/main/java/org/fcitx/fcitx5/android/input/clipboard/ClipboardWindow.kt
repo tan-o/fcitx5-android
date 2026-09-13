@@ -37,6 +37,7 @@ import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardSearch
+import org.fcitx.fcitx5.android.data.clipboard.ClipboardTags
 import org.fcitx.fcitx5.android.data.handwriting.HandwritingPinyin
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
@@ -100,6 +101,8 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     private var inSearchMode = false
 
     private var searchQuery = ""
+    private var selectedTag: String? = null
+    private var tagEntry: ClipboardEntry? = null
 
     private fun submitEntries(pagingSourceFactory: () -> PagingSource<Int, ClipboardEntry>) {
         adapterSubmitJob?.cancel()
@@ -110,6 +113,7 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     }
 
     private fun setSearching(on: Boolean) {
+        tagEntry = null
         inSearchMode = on
         searchQuery = ""
         ui.setSearchMode(on)
@@ -123,8 +127,12 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
     private fun updateSearchQuery(query: String) {
         searchQuery = query
-        ui.updateSearchQuery(query)
-        submitSearchEntries(query)
+        if (tagEntry != null) {
+            ui.updateTagQuery(query)
+        } else {
+            ui.updateSearchQuery(query)
+            submitSearchEntries(query)
+        }
     }
 
     private fun submitSearchEntries(query: String) {
@@ -153,7 +161,10 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
                     }
                 }
                 FcitxKeyMapping.FcitxKey_space -> updateSearchQuery("$searchQuery ")
-                FcitxKeyMapping.FcitxKey_Return -> setSearching(false)
+                FcitxKeyMapping.FcitxKey_Return -> {
+                    tagEntry?.let { ClipboardTags.set(it.id, searchQuery) }
+                    setSearching(false)
+                }
                 in 0xffb0..0xffb9 -> updateSearchQuery(searchQuery + (sym - 0xffb0))
                 0xffab -> updateSearchQuery("$searchQuery+")
                 0xffad -> updateSearchQuery("$searchQuery-")
@@ -169,19 +180,50 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
     }
 
     private val loadStateListener: (CombinedLoadStates) -> Unit = {
-        if (!inSearchMode && it.refresh is androidx.paging.LoadState.NotLoading) {
+        if (!inSearchMode && ui.tabsUi.activeTab == ClipboardTab.Recent &&
+            it.refresh is androidx.paging.LoadState.NotLoading) {
             val empty = adapter.itemCount == 0
             stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to empty)
         }
     }
 
     private fun submitTabEntries(tab: ClipboardTab) {
-        submitEntries {
-            when (tab) {
-                ClipboardTab.Recent -> ClipboardManager.recentEntries()
-                ClipboardTab.Pinned -> ClipboardManager.pinnedEntries()
+        when (tab) {
+            ClipboardTab.Recent -> {
+                selectedTag = null
+                ui.hideCategories()
+                submitEntries { ClipboardManager.recentEntries() }
+            }
+            ClipboardTab.Pinned -> {
+                adapterSubmitJob?.cancel()
+                adapterSubmitJob = service.lifecycleScope.launch {
+                    ClipboardManager.observeEntries().collectLatest { entries ->
+                        val pinned = entries.filter(ClipboardEntry::pinned)
+                        val labels = ClipboardTags.labels(pinned)
+                        if (selectedTag !in labels) selectedTag = null
+                        ui.showCategories(labels, selectedTag) { tag ->
+                            if (tag != selectedTag) {
+                                selectedTag = tag
+                                submitTabEntries(ClipboardTab.Pinned)
+                            }
+                        }
+                        val shown = selectedTag?.let { tag ->
+                            pinned.filter { ClipboardTags.label(it) == tag }
+                        } ?: pinned
+                        adapter.submitData(PagingData.from(shown))
+                        stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to shown.isEmpty())
+                    }
+                }
             }
         }
+    }
+
+    private fun promptTag(entry: ClipboardEntry) {
+        tagEntry = entry
+        inSearchMode = true
+        searchQuery = ClipboardTags.customLabel(entry)
+        ui.setSearchMode(true)
+        ui.updateTagQuery(searchQuery)
     }
 
     private val adapter: ClipboardAdapter by lazy {
@@ -200,6 +242,10 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
             override fun onEdit(id: Int) {
                 AppUtil.launchClipboardEdit(context, id)
+            }
+
+            override fun onTag(entry: ClipboardEntry) {
+                promptTag(entry)
             }
 
             override fun onShare(entry: ClipboardEntry) {
@@ -261,7 +307,10 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
             enableUi.enableButton.setOnClickListener {
                 clipboardEnabledPref.setValue(true)
             }
-            tabsUi.onTabSelected = { submitTabEntries(it) }
+            tabsUi.onTabSelected = {
+                selectedTag = null
+                submitTabEntries(it)
+            }
             searchKeyboards.forEach { it.keyActionListener = searchKeyActionListener }
             searchBar.setOnLongClickListener {
                 val clip = context.clipboardManager.primaryClip
