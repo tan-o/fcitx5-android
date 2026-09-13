@@ -8,6 +8,9 @@ assert len(apks) == 1, f'Expected one main APK, got {apks}'
 model = 'usr/share/rime-data/wanxiang-lts-zh-hans.gram'
 with zipfile.ZipFile(apks[0]) as apk:
     assert 'lib/arm64-v8a/librime.so' in apk.namelist(), 'Embedded Rime library missing'
+    assert 'lib/arm64-v8a/libonnxruntime.so' in apk.namelist(), 'Handwriting ONNX Runtime missing'
+    assert not any(p.startswith('lib/') and not p.startswith('lib/arm64-v8a/') for p in apk.namelist() if p.endswith('.so')), 'Unexpected non-arm64 library'
+    assert not any(p.endswith('.onnx') for p in apk.namelist()), 'Optional speech weights must not be bundled'
     descriptor = json.loads(apk.read('assets/descriptor.json'))
     assert model not in descriptor['files'], 'Optional model must not be in the installation descriptor'
     assert not any(path.endswith('.gram') for path in apk.namelist()), 'Optional model must not be bundled'

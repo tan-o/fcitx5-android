@@ -1,9 +1,9 @@
 # 离线手写输入
 
-使用 ML Kit Digital Ink Recognition 19.0.0 的简体中文笔迹模型。首次使用由用户点击下载，之后在设备上识别。模型约 20 MB，不随 APK 打包。下载需要能连接 Google 模型服务；SDK 不提供字节进度，因此界面显示不定进度条，不虚构百分比。
+使用 RapidOCR 发布的 PP-OCRv6 small 中文识别模型和 ONNX Runtime。模型由用户选择后台下载，约 20 MB，支持进度显示和断点续传；识别完全在本机完成。
 
-保留笔画时间与连续轨迹，按实际笔迹包围盒平移，避免在画布上写偏导致识别坐标发生变化。
-接入文档：https://developers.google.com/ml-kit/vision/digital-ink-recognition/android
+模型把笔迹按实际包围盒居中成图像，因此在画布上写偏不改变输入坐标。连笔识别依赖 PP-OCRv6 对手写体的泛化能力，仍需用真实笔迹验证。
+模型：https://www.modelscope.cn/models/RapidAI/RapidOCR/
 
 pinyin.txt 来自 mozillazg/pinyin-data 的通规字常用读音，用于候选注音，多音字不做上下文判断。
 

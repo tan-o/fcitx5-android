@@ -87,9 +87,6 @@ class MainFragment : PaddingPreferenceFragment() {
                 )
             }
             addCategory("Android") {
-                addPreference("Samsung 与系统语音", icon = R.drawable.ic_baseline_settings_24) {
-                    navigateWithAnim(SettingsRoute.Voice)
-                }
                 addPreference("DeepSeek 翻译", icon = R.drawable.ic_baseline_language_24) {
                     navigateWithAnim(SettingsRoute.DeepSeekTranslation)
                 }

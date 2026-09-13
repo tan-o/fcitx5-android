@@ -5,11 +5,12 @@ import android.text.InputType
 import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
+import androidx.work.WorkManager
+import androidx.work.getWorkInfosForUniqueWorkFlow
 import android.app.AlertDialog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -72,31 +73,8 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
                 addPreference(modelStatus)
                 modelDownload = Preference(ctx).apply {
                     setOnPreferenceClickListener {
-                        runOperation {
-                            val message = TextView(ctx).apply { text = "正在查询模型版本…" }
-                            val progress = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply { isIndeterminate = true }
-                            val panel = LinearLayout(ctx).apply {
-                                orientation = LinearLayout.VERTICAL
-                                val padding = (24 * resources.displayMetrics.density).toInt()
-                                setPadding(padding, padding, padding, padding)
-                                addView(message)
-                                addView(progress, LinearLayout.LayoutParams(-1, -2))
-                            }
-                            val task = kotlin.coroutines.coroutineContext[kotlinx.coroutines.Job]
-                            val dialog = AlertDialog.Builder(ctx).setTitle("下载万象模型").setView(panel)
-                                .setNegativeButton("取消") { _, _ -> task?.cancel() }.create()
-                            dialog.setCanceledOnTouchOutside(false)
-                            dialog.setOnCancelListener { task?.cancel() }
-                            dialog.show()
-                            try {
-                                WanxiangModel.update { received, total ->
-                                    progress.isIndeterminate = false
-                                    progress.progress = (received * 100 / total).toInt()
-                                    message.text = if (received == total) "下载完成，正在校验和部署…" else
-                                        "${progress.progress}% · ${received / 1024 / 1024}/${total / 1024 / 1024} MiB"
-                                }
-                            } finally { dialog.dismiss() }
-                        }
+                        org.fcitx.fcitx5.android.data.download.ModelDownloadWorker.enqueue("wanxiang")
+                        status.summary = "已加入后台下载；通知栏查看进度。网络中断自动续传，暂停后点击下载继续。"
                         true
                     }
                 }
@@ -117,6 +95,16 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
             addPreference(custom)
         }
         refresh()
+        lifecycleScope.launch {
+            WorkManager.getInstance(ctx).getWorkInfosForUniqueWorkFlow("model-wanxiang").collect { rows ->
+                val active = rows.firstOrNull { !it.state.isFinished }
+                if (active != null) status.summary = active.progress.getString("text") ?: "后台任务等待运行／联网后续传"
+                else if (rows.isNotEmpty()) {
+                    refresh()
+                    status.summary = rows.first().outputData.getString("text") ?: "任务已暂停；点击下载可续传"
+                }
+            }
+        }
     }
     private fun refresh() {
         modelStatus.summary = if (WanxiangModel.installed) "已下载 · ${WanxiangModel.installedSize / 1024 / 1024} MiB；可为已有拼音方案启用" else "未下载；可选下载，不影响 Rime 正常使用，不替换输入方案"

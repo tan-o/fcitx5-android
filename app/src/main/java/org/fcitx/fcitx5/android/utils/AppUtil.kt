@@ -33,9 +33,6 @@ object AppUtil {
         }
     }
 
-    fun launchMainToVoice(context: Context) =
-        launchMainToDest(context, SettingsRoute.Voice)
-
     fun launchMainToTranslation(context: Context) =
         launchMainToDest(context, SettingsRoute.DeepSeekTranslation)
     fun launchMainToLookup(context: Context) =

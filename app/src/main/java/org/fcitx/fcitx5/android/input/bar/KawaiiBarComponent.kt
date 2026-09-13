@@ -104,7 +104,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
     private val expandedCandidateStyle by prefs.keyboard.expandedCandidateStyle
     private val expandToolbarByDefault by prefs.keyboard.expandToolbarByDefault
     private val toolbarNumRowOnPassword by prefs.keyboard.toolbarNumRowOnPassword
-    private val showVoiceInputButton by prefs.keyboard.showVoiceInputButton
 
     private var clipboardTimeoutJob: Job? = null
 
@@ -254,10 +253,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         } else false
     }
 
-    private val switchToVoiceInputCallback = View.OnClickListener {
-        windowManager.attachWindow(org.fcitx.fcitx5.android.input.voice.VoiceWindow())
-    }
-
     private val idleUi: IdleUi by lazy {
         IdleUi(context, theme, popup, commonKeyActionListener).apply {
             menuButton.setOnClickListener {
@@ -291,8 +286,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                 undoButton.setOnClickListener {
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true)
                 }
-                undoButton.setOnLongClickListener { service.editingHistory.show(); true }
-                redoButton.setOnLongClickListener { service.editingHistory.show(); true }
+                undoButton.setOnLongClickListener { service.pinyinReconversion.restore(); true }
                 redoButton.setOnClickListener {
                     service.sendCombinationKeyEvents(KeyEvent.KEYCODE_Z, ctrl = true, shift = true)
                 }
@@ -451,12 +445,7 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             idleUi.inlineSuggestionsBar.clear()
         }
-        val shouldShowVoiceInput =
-            showVoiceInputButton && !capFlags.has(CapabilityFlag.Password)
-        idleUi.setHideKeyboardIsVoiceInput(
-            shouldShowVoiceInput,
-            if (shouldShowVoiceInput) switchToVoiceInputCallback else hideKeyboardCallback
-        )
+        idleUi.setHideKeyboardIsVoiceInput(false, hideKeyboardCallback)
         evalIdleUiState()
     }
 

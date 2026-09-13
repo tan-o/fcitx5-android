@@ -9,6 +9,8 @@ import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ScrollView
+import android.widget.PopupWindow
+import android.graphics.drawable.ColorDrawable
 import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
@@ -67,6 +69,10 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         addView(source, LinearLayout.LayoutParams(0, -1, 1f))
         addView(balance, LinearLayout.LayoutParams(-2, -1))
         addView(translate, LinearLayout.LayoutParams(service.dp(40), -1))
+        addView(button("⚙").apply { setOnClickListener {
+            try { if (lookupMode) AppUtil.launchMainToLookup(service) else AppUtil.launchMainToTranslation(service) }
+            catch (e: Exception) { Toast.makeText(service, e.message, Toast.LENGTH_LONG).show() }
+        } }, LinearLayout.LayoutParams(service.dp(36), -1))
         addView(button("×").apply { setOnClickListener { close() } }, LinearLayout.LayoutParams(service.dp(40), -1))
     }
     private val result = TextView(service).apply {
@@ -76,14 +82,35 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         setPadding(service.dp(16), service.dp(8), service.dp(16), service.dp(8))
     }
     private val results = ScrollView(service).apply { addView(result); visibility = View.GONE }
+    private val lookupPopup = PopupWindow(results, -1, service.dp(180), false).apply {
+        setBackgroundDrawable(ColorDrawable(theme.keyboardColor))
+        elevation = service.dp(8).toFloat()
+        inputMethodMode = PopupWindow.INPUT_METHOD_NOT_NEEDED
+    }
+    private fun showLookupResult(text: String) {
+        result.text = text
+        results.visibility = View.VISIBLE
+        row.post {
+            if (root.visibility != View.VISIBLE || row.windowToken == null || !lookupMode) return@post
+            val position = IntArray(2)
+            row.getLocationInWindow(position)
+            lookupPopup.width = row.width
+            val y = maxOf(0, position[1] - service.dp(180))
+            try {
+                if (lookupPopup.isShowing) lookupPopup.update(position[0], y, row.width, service.dp(180))
+                else lookupPopup.showAtLocation(row, Gravity.TOP or Gravity.LEFT, position[0], y)
+            } catch (e: android.view.WindowManager.BadTokenException) {
+                Toast.makeText(service, text, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     val root = LinearLayout(service).apply {
         orientation = LinearLayout.VERTICAL
         visibility = View.GONE
         setBackgroundColor(theme.keyboardColor)
-        addView(results, LinearLayout.LayoutParams(-1, service.dp(160)))
         addView(row, LinearLayout.LayoutParams(-1, service.dp(48)))
     }
-    init { source.doAfterTextChanged { results.visibility = View.GONE } }
+    init { source.doAfterTextChanged { lookupPopup.dismiss() } }
     fun toggle(lookup: Boolean = false) {
         if (root.visibility == View.VISIBLE) {
             val sameMode = lookupMode == lookup
@@ -91,8 +118,8 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
             if (sameMode) return
         }
         lookupMode = lookup
-        if (if (lookup) !Maimemo.configured else !DeepSeek.configured) {
-            if (lookup) AppUtil.launchMainToLookup(service) else AppUtil.launchMainToTranslation(service)
+        if (!lookup && !DeepSeek.configured) {
+            AppUtil.launchMainToTranslation(service)
             return
         }
         language.visibility = if (lookup) View.GONE else View.VISIBLE
@@ -111,6 +138,7 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
             if (root.visibility != View.VISIBLE) return@launch
             target = KeyboardTextTarget(source).also { service.keyboardTextTarget = it }
             if (!lookupMode) refreshBalance()
+            else if (!Maimemo.configured) showLookupResult("点击 ⚙ 设置墨墨 API Token 后即可查词。")
         }
     }
     private fun refreshBalance() {
@@ -131,8 +159,7 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
                 if (lookupMode) {
                     val output = Maimemo.lookup(text)
                     if (source.text.toString().trim() == text && service.keyboardTextTarget === target) {
-                        result.text = output
-                        results.visibility = View.VISIBLE
+                        showLookupResult(output)
                     }
                     return@launch
                 }
@@ -150,11 +177,15 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
                 service.commitText(output)
                 refreshBalance()
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { Toast.makeText(service, e.message, Toast.LENGTH_LONG).show() }
+            catch (e: Exception) {
+                if (lookupMode) showLookupResult(e.message ?: "查询失败")
+                else Toast.makeText(service, e.message, Toast.LENGTH_LONG).show()
+            }
             finally { translate.isEnabled = true }
         }
     }
     fun close() {
+        lookupPopup.dismiss()
         if (root.visibility != View.VISIBLE && target == null) return
         task?.cancel()
         balanceJob?.cancel()

@@ -37,30 +37,6 @@ class ModsInteractionTest {
             device.pressBack()
         }
     }
-    @Test fun voiceServiceDialogOpens() {
-        open(SettingsRoute.Voice).use {
-            click("识别服务")
-            assertTrue(device.wait(Until.hasObject(By.text("选择公开语音服务")), 5000))
-            device.pressBack()
-        }
-    }
-    @Test fun longPressUndoOpensHistoryInsideTheIme() {
-        val ime = "${BuildConfig.APPLICATION_ID}/org.fcitx.fcitx5.android.input.FcitxInputMethodService"
-        device.executeShellCommand("ime enable $ime")
-        device.executeShellCommand("ime set $ime")
-        open(SettingsRoute.Rime).use {
-            click("Clone 方案仓库")
-            val field = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 5000)
-            assertNotNull(field)
-            field.click()
-            field.text = "history"
-            val undo = device.wait(Until.findObject(By.desc(context.getString(R.string.undo))), 15_000)
-            assertNotNull("IME toolbar did not appear", undo)
-            undo.longClick()
-            assertTrue(device.wait(Until.hasObject(By.text("编辑历史（当前输入框）")), 5000))
-            device.pressBack()
-        }
-    }
     @Test fun jgitCanCloneAPublicSchemeOnAndroid() = runBlocking {
         val repo = RimeManager.clone("https://github.com/rime/rime-prelude.git")
         try { assertTrue(repo.resolve("punctuation.yaml").isFile); RimeManager.update(repo) }

@@ -28,7 +28,7 @@ class WordLookupSettingsFragment : PaddingPreferenceFragment() {
             })
             addPreference(Preference(ctx).apply {
                 title = "开放接口范围"
-                summary = "可查单词和自己创建的释义；墨墨官方 API 未开放完整词典释义。留空保存 Token 可移除授权。"
+                summary = "当前快捷查词调用 vocabulary 和 interpretations 两个官方接口，显示单词及你创建的释义；留空保存可移除 Token。"
                 isSelectable = false
             })
         }

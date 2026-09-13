@@ -229,15 +229,15 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         lastKnownConfig = resources.configuration
     }
 
-    val editingHistory by lazy { org.fcitx.fcitx5.android.input.history.EditingHistory(this) }
+    val pinyinReconversion by lazy { org.fcitx.fcitx5.android.input.history.PinyinReconversion(this) }
 
     var keyboardTextTarget: org.fcitx.fcitx5.android.input.translation.KeyboardTextTarget? = null
     var closeTranslation: (() -> Unit)? = null
-    var stopVoiceInput: (() -> Unit)? = null
 
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         if (keyboardTextTarget?.consume(event) == true) return
         when (event) {
+            is FcitxEvent.InputPanelEvent -> pinyinReconversion.preedit(event.data.preedit.toString())
             is FcitxEvent.CommitStringEvent -> {
                 commitText(event.data.text, event.data.cursor)
             }
@@ -318,6 +318,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
                 handleDeleteSurrounding(before, after)
             }
             is FcitxEvent.IMChangeEvent -> {
+                pinyinReconversion.clear()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     val im = event.data.uniqueName
                     val subtype = SubtypeManager.subtypeOf(im) ?: return
@@ -429,7 +430,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     fun commitText(text: String, cursor: Int = -1) {
         keyboardTextTarget?.let { it.commit(text); return }
-        editingHistory.capture()
+        pinyinReconversion.committed(text)
         val ic = currentInputConnection ?: return
         // when composing text equals commit content, finish composing text as-is
         if (composing.isNotEmpty() && composingText.toString() == text) {
@@ -735,7 +736,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
         closeTranslation?.invoke()
-        stopVoiceInput?.invoke()
         keyboardTextTarget = null
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
@@ -745,8 +745,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         resetComposingState()
         val flags = CapabilityFlags.fromEditorInfo(attribute)
         capabilityFlags = flags
-        editingHistory.reset(!flags.has(org.fcitx.fcitx5.android.core.CapabilityFlag.Password) && attribute.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING == 0)
-        editingHistory.capture()
+        pinyinReconversion.reset(!flags.has(org.fcitx.fcitx5.android.core.CapabilityFlag.Password) && attribute.imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING == 0)
         // EditorInfo may change between onStartInput and onStartInputView
         inputDeviceMgr.notifyOnStartInput(attribute)
         Timber.d("onStartInput: initialSel=${selection.current}, restarting=$restarting")
@@ -810,7 +809,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
             cursorUpdateIndex
         )
         inputView?.updateSelection(newSelStart, newSelEnd)
-        if (candidatesStart < 0) editingHistory.capture()
     }
 
     private val contentSize = floatArrayOf(0f, 0f)
@@ -1064,7 +1062,6 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         closeTranslation?.invoke()
-        stopVoiceInput?.invoke()
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
@@ -1082,9 +1079,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
 
     override fun onFinishInput() {
         closeTranslation?.invoke()
-        stopVoiceInput?.invoke()
         keyboardTextTarget = null
-        editingHistory.reset(false)
+        pinyinReconversion.reset(false)
         Timber.d("onFinishInput")
         postFcitxJob {
             focus(false)

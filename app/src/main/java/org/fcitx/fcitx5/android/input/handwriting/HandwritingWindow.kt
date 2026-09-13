@@ -87,13 +87,20 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
             try {
                 val engine = recognizer ?: HandwritingRecognizer().also { recognizer = it }
                 if (download) {
-                    status.text = "正在下载中文手写模型（约 20 MB）…"
+                    status.text = "后台下载手写模型中；可返回键盘，进度见通知栏"
                     downloadProgress.visibility = View.VISIBLE
-                    engine.download()
+                    engine.download { received, total, text ->
+                        status.text = text.ifBlank { "后台下载手写模型中；可返回键盘" }
+                        downloadProgress.isIndeterminate = total <= 0
+                        if (total > 0) {
+                            downloadProgress.max = 1000
+                            downloadProgress.progress = (received * 1000 / total).toInt()
+                        }
+                    }
                 }
                 if (!attached) return@launch
                 if (!engine.isReady()) {
-                    status.text = "点击下载中文手写模型（约 20 MB）"
+                    status.text = "点击后台下载手写模型（约 20 MB，支持续传）"
                     status.setOnClickListener { prepareModel(true) }
                     return@launch
                 }

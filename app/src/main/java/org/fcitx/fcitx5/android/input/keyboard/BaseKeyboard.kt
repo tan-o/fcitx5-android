@@ -193,7 +193,7 @@ abstract class BaseKeyboard(
                             0 -> false
                             else -> {
                                 trackpadActive = true
-                                invalidate()
+                                this@BaseKeyboard.invalidate()
                                 val sym =
                                     if (count > 0) FcitxKeyMapping.FcitxKey_Right else FcitxKeyMapping.FcitxKey_Left
                                 val action = KeyAction.SymAction(KeySym(sym), KeyStates.Virtual)

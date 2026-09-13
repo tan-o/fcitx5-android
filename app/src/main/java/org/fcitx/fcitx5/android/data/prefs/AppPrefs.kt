@@ -148,9 +148,6 @@ class AppPrefs(private val sharedPreferences: SharedPreferences) {
             false
         )
 
-        val showVoiceInputButton =
-            switch(R.string.show_voice_input_button, "show_voice_input_button", true)
-
 
         val expandKeypressArea =
             switch(R.string.expand_keypress_area, "expand_keypress_area", false)

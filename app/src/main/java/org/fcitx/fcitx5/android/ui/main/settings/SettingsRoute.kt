@@ -96,9 +96,6 @@ sealed class SettingsRoute : Parcelable {
     data object Rime : SettingsRoute()
 
     @Serializable
-    data object Voice : SettingsRoute()
-
-    @Serializable
     data object Developer : SettingsRoute()
 
     @Serializable
@@ -198,7 +195,6 @@ sealed class SettingsRoute : Parcelable {
 
             /* ========== Index ========== */
 
-            fragment<VoiceSettingsFragment, Voice> { label = "Samsung 与系统语音" }
             fragment<RimeSettingsFragment, Rime> { label = "Rime" }
             fragment<DeepSeekSettingsFragment, DeepSeekTranslation> { label = "DeepSeek 翻译" }
             fragment<WordLookupSettingsFragment, WordLookup> { label = "墨墨查词" }
