@@ -30,10 +30,12 @@ object Maimemo {
     }
     fun saveToken(value: String) {
         if (value.isBlank()) { keyFile.delete(); return }
+        val token = value.trim().removePrefix("Bearer ").trim()
+        require(token.isNotEmpty()) { "Token 不能为空" }
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, secret())
         keyFile.writeText(Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + "\n" +
-            Base64.encodeToString(cipher.doFinal(value.trim().toByteArray(Charsets.UTF_8)), Base64.NO_WRAP))
+            Base64.encodeToString(cipher.doFinal(token.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP))
     }
     private fun token(): String {
         check(configured) { "请先设置墨墨开放 API Token" }
@@ -49,14 +51,43 @@ object Maimemo {
             connection.connectTimeout = 15000
             connection.readTimeout = 20000
             connection.setRequestProperty("Authorization", "Bearer ${token()}")
-            check(connection.responseCode in 200..299) { "墨墨 HTTP ${connection.responseCode}" }
-            return JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            connection.setRequestProperty("Accept", "application/json")
+            val code = connection.responseCode
+            val body = (if (code in 200..299) connection.inputStream else connection.errorStream)
+                ?.bufferedReader()?.use { it.readText() }.orEmpty()
+            val root = runCatching { JSONObject(body) }.getOrElse { error("墨墨返回了无法解析的响应（HTTP $code）") }
+            val error = root.optJSONArray("errors")?.optJSONObject(0)?.optString("msg").orEmpty()
+            check(code in 200..299 && root.optBoolean("success")) {
+                error.ifBlank { "墨墨 HTTP $code" }
+            }
+            return root.getJSONObject("data")
         } finally { connection.disconnect() }
     }
     suspend fun lookup(spelling: String): String = withContext(Dispatchers.IO) {
-        val voc = request("vocabulary?spelling=${URLEncoder.encode(spelling.trim(), "UTF-8")}").getJSONObject("voc")
-        val items = request("interpretations?voc_id=${URLEncoder.encode(voc.getString("id"), "UTF-8")}").getJSONArray("interpretations")
-        val meanings = (0 until items.length()).joinToString("\n\n") { items.getJSONObject(it).getString("interpretation") }
-        "${voc.getString("spelling")}\n\n" + meanings.ifBlank { "已找到单词，暂无你创建的释义。墨墨开放 API 不提供完整词典释义。" }
+        val query = spelling.trim()
+        require(query.matches(Regex("[A-Za-z][A-Za-z .'-]{0,63}"))) { "请输入英文单词或短语" }
+        val voc = request("vocabulary?spelling=${URLEncoder.encode(query, "UTF-8")}").getJSONObject("voc")
+        val id = URLEncoder.encode(voc.getString("id"), "UTF-8")
+        val interpretations = request("interpretations?voc_id=$id").getJSONArray("interpretations")
+        val phrases = request("phrases?voc_id=$id").getJSONArray("phrases")
+        val notes = request("notes?voc_id=$id").getJSONArray("notes")
+        val sections = mutableListOf<String>()
+        (0 until interpretations.length()).mapNotNull { index ->
+            interpretations.optJSONObject(index)?.optString("interpretation")?.takeIf { it.isNotBlank() }
+        }.take(6).takeIf { it.isNotEmpty() }?.let { sections += "释义\n${it.joinToString("\n")}" }
+        (0 until phrases.length()).mapNotNull { index ->
+            phrases.optJSONObject(index)?.let { item ->
+                val phrase = item.optString("phrase")
+                val meaning = item.optString("interpretation")
+                phrase.takeIf { it.isNotBlank() }?.let { if (meaning.isBlank()) it else "$it\n$meaning" }
+            }
+        }.take(4).takeIf { it.isNotEmpty() }?.let { sections += "例句\n${it.joinToString("\n\n")}" }
+        (0 until notes.length()).mapNotNull { index ->
+            notes.optJSONObject(index)?.let { item ->
+                val text = item.optString("note")
+                text.takeIf { it.isNotBlank() }?.let { note -> item.optString("note_type").takeIf { it.isNotBlank() }?.let { "$it：$note" } ?: note }
+            }
+        }.take(4).takeIf { it.isNotEmpty() }?.let { sections += "助记\n${it.joinToString("\n")}" }
+        "${voc.getString("spelling")}\n\n" + sections.joinToString("\n\n").ifBlank { "已找到词条，暂无可显示的释义、例句或助记。" }
     }
 }

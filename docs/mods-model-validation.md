@@ -17,7 +17,7 @@
 - 翻译／查词面板挂在固定高度的键盘区域上方；查词列表在输入条上方展开。
 - 空格移动光标时，键盘停止绘制按键并显示触控板；默认每 24 dp 移动一格，可设置 8–64 dp。当前为横向移动。
 - DeepSeek 系统提示词可编辑，`{targetLanguage}` 替换成目标语言。
-- 墨墨快捷查词只调用官方只读的 vocabulary 和 interpretations 接口；结果在键盘上方向上悬浮显示，接口错误也只显示在浮窗中。
+- 墨墨快捷查词只读调用官方 vocabulary、interpretations、phrases、notes 接口；结果在键盘上方向上悬浮显示，接口错误也只显示在浮窗中。
 - 万象按方案覆盖六个 Octagram grammar 参数，空值不覆盖原方案。
 - Actions 只构建 arm64；未运行 Android 模拟器。手机窗口、触控、麦克风和系统服务仍需真机确认。
 

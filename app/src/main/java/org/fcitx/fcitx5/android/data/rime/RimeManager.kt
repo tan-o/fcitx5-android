@@ -65,6 +65,7 @@ object RimeManager {
                 destination.parentFile!!.mkdirs()
                 val temporary = File(destination.parentFile, destination.name + ".installing")
                 source.copyTo(temporary, overwrite = true)
+                if (destination.exists()) check(destination.delete()) { "无法替换 ${source.name}" }
                 check(temporary.renameTo(destination)) { "无法安装 ${source.name}" }
             }
             redeploy()

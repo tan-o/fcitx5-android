@@ -28,7 +28,7 @@ class WordLookupSettingsFragment : PaddingPreferenceFragment() {
             })
             addPreference(Preference(ctx).apply {
                 title = "开放接口范围"
-                summary = "当前快捷查词调用 vocabulary 和 interpretations 两个官方接口，显示单词及你创建的释义；留空保存可移除 Token。"
+                summary = "快捷查词只读调用官方 vocabulary、interpretations、phrases、notes 接口，向上浮窗显示词条、释义、例句和助记；留空保存可移除 Token。"
                 isSelectable = false
             })
         }
