@@ -8,14 +8,11 @@ import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
-import android.widget.ScrollView
-import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.data.translation.DeepSeek
-import org.fcitx.fcitx5.android.data.translation.Maimemo
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import splitties.dimensions.dp
@@ -24,7 +21,6 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
     private var task: Job? = null
     private var balanceJob: Job? = null
     private var target: KeyboardTextTarget? = null
-    private var lookupMode = false
     private fun button(label: String) = TextView(service).apply {
         text = label
         gravity = Gravity.CENTER
@@ -67,46 +63,18 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         addView(translate, LinearLayout.LayoutParams(service.dp(40), -1))
         addView(button("×").apply { setOnClickListener { close() } }, LinearLayout.LayoutParams(service.dp(40), -1))
     }
-    private val result = TextView(service).apply {
-        setTextColor(theme.keyTextColor)
-        textSize = 16f
-        setTextIsSelectable(true)
-        setPadding(service.dp(16), service.dp(8), service.dp(16), service.dp(8))
-    }
-    private val results = ScrollView(service).apply { addView(result); visibility = View.GONE }
-    private fun showResult(text: String) {
-        result.text = text
-        results.visibility = View.VISIBLE
-        root.requestLayout()
-        service.requestInputLayout()
-    }
     val root = LinearLayout(service).apply {
         orientation = LinearLayout.VERTICAL
         visibility = View.GONE
         setBackgroundColor(theme.keyboardColor)
-        addView(results, LinearLayout.LayoutParams(-1, service.dp(180)))
         addView(row, LinearLayout.LayoutParams(-1, service.dp(48)))
     }
-    init {
-        source.doAfterTextChanged {
-            results.visibility = View.GONE
-            root.requestLayout()
-            service.requestInputLayout()
-        }
-    }
-    fun toggle(lookup: Boolean = false) {
+    fun toggle() {
         if (root.visibility == View.VISIBLE) {
-            val sameMode = lookupMode == lookup
             close()
-            if (sameMode) return
+            return
         }
-        lookupMode = lookup
-        language.visibility = if (lookup) View.GONE else View.VISIBLE
-        balance.visibility = if (lookup) View.GONE else View.VISIBLE
-        source.hint = if (lookup) "输入要查询的单词" else "输入要翻译的文本"
-        translate.text = if (lookup) "查" else "译"
         translate.isEnabled = true
-        results.visibility = View.GONE
         root.visibility = View.VISIBLE
         service.requestInputLayout()
         service.closeTranslation = { close() }
@@ -118,15 +86,15 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
                 service.postFcitxJob { focusOutIn() }.join()
                 if (root.visibility != View.VISIBLE) return@launch
                 target = KeyboardTextTarget(source).also { service.keyboardTextTarget = it }
-                when {
-                    lookupMode && !Maimemo.configured -> showResult("请先在应用设置的“墨墨查词”中填写 API Token。")
-                    !lookupMode && !DeepSeek.configured -> showResult("请先在应用设置的“DeepSeek 翻译”中填写 API Key。")
-                    !lookupMode -> refreshBalance()
+                if (!DeepSeek.configured) {
+                    Toast.makeText(service, "请先在应用设置的“DeepSeek 翻译”中填写 API Key 并选择模型。", Toast.LENGTH_LONG).show()
+                } else {
+                    refreshBalance()
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                showResult(e.message ?: "输入面板初始化失败")
+                Toast.makeText(service, e.message ?: "输入面板初始化失败", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -145,13 +113,6 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         translate.isEnabled = false
         task = service.lifecycleScope.launch {
             try {
-                if (lookupMode) {
-                    val output = Maimemo.lookup(text)
-                    if (source.text.toString().trim() == text && service.keyboardTextTarget === target) {
-                        showResult(output)
-                    }
-                    return@launch
-                }
                 val output = DeepSeek.translate(text, language)
                 if (source.text.toString().trim() != text || DeepSeek.language != language) {
                     Toast.makeText(service, "原文或目标语言已变化，请重新翻译", Toast.LENGTH_SHORT).show()
@@ -164,11 +125,10 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
                 service.commitText(output)
                 source.text.clear()
                 target = KeyboardTextTarget(source).also { service.keyboardTextTarget = it }
-                showResult(output)
                 refreshBalance()
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
-                showResult(e.message ?: if (lookupMode) "查询失败" else "翻译失败")
+                Toast.makeText(service, e.message ?: "翻译失败", Toast.LENGTH_LONG).show()
             }
             finally { translate.isEnabled = true }
         }

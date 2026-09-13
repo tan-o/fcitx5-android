@@ -303,10 +303,6 @@ class KawaiiBarComponent : UniqueViewComponent<KawaiiBarComponent, FrameLayout>(
                     windowManager.attachWindow(KeyboardWindow)
                     (windowManager.getEssentialWindow(KeyboardWindow) as KeyboardWindow).toggleTranslation()
                 }
-                lookupButton.setOnClickListener {
-                    windowManager.attachWindow(KeyboardWindow)
-                    (windowManager.getEssentialWindow(KeyboardWindow) as KeyboardWindow).toggleLookup()
-                }
                 moreButton.setOnClickListener {
                     windowManager.attachWindow(StatusAreaWindow())
                 }

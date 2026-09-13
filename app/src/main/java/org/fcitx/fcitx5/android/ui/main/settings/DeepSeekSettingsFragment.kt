@@ -5,6 +5,7 @@ import android.text.InputType
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.EditTextPreference
+import androidx.preference.ListPreference
 import androidx.preference.Preference
 import android.app.AlertDialog
 import kotlinx.coroutines.CancellationException
@@ -16,6 +17,21 @@ class DeepSeekSettingsFragment : PaddingPreferenceFragment() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val ctx = requireContext()
         preferenceScreen = preferenceManager.createPreferenceScreen(ctx).apply {
+            addPreference(ListPreference(ctx).apply {
+                key = "deepseek_prompt_preset_editor"
+                title = "翻译风格"
+                isPersistent = false
+                entries = DeepSeek.promptPresets.map { it.label }.toTypedArray()
+                entryValues = DeepSeek.promptPresets.map { it.id }.toTypedArray()
+                value = DeepSeek.promptPreset
+                summary = DeepSeek.promptPresets.firstOrNull { it.id == value }?.label
+                setOnPreferenceChangeListener { _, newValue ->
+                    DeepSeek.promptPreset = newValue.toString()
+                    value = newValue.toString()
+                    summary = DeepSeek.promptPresets.firstOrNull { it.id == value }?.label
+                    true
+                }
+            })
             addPreference(EditTextPreference(ctx).apply {
                 key = "deepseek_prompt_editor"
                 title = "翻译提示词"
@@ -31,6 +47,7 @@ class DeepSeekSettingsFragment : PaddingPreferenceFragment() {
                     val prompt = value.toString().trim()
                     if (prompt.isBlank()) false else {
                         DeepSeek.prompt = prompt
+                        DeepSeek.promptPreset = "custom"
                         summary = prompt
                         true
                     }

@@ -31,19 +31,33 @@ object KeyGestureActions {
     fun defaultLongPressSpec(key: String): String =
         PopupPreset[key.lowercase()].orEmpty().joinToString("\n")
 
-    fun upSwipe(context: Context, key: String): Entry? {
+    fun upSwipeSpec(context: Context, key: String): String {
         val normalized = key.lowercase()
-        val spec = PreferenceManager.getDefaultSharedPreferences(context)
+        return PreferenceManager.getDefaultSharedPreferences(context)
             .getString(upSwipePreferenceKey(normalized), defaultUpSwipeSpec(normalized))
             .orEmpty()
-        return parse(spec)
+    }
+
+    fun longPressSpec(context: Context, key: String): String {
+        val normalized = key.lowercase()
+        return PreferenceManager.getDefaultSharedPreferences(context)
+            .getString(longPressPreferenceKey(normalized), null)
+            ?: defaultLongPressSpec(key)
+    }
+
+    fun save(context: Context, key: String, upSwipe: String, longPress: String) {
+        PreferenceManager.getDefaultSharedPreferences(context).edit()
+            .putString(upSwipePreferenceKey(key), upSwipe.trim())
+            .putString(longPressPreferenceKey(key), longPress.trim())
+            .apply()
+    }
+
+    fun upSwipe(context: Context, key: String): Entry? {
+        return parse(upSwipeSpec(context, key))
     }
 
     fun longPress(context: Context, key: String): List<Entry> {
-        val normalized = key.lowercase()
-        val stored = PreferenceManager.getDefaultSharedPreferences(context)
-            .getString(longPressPreferenceKey(normalized), null)
-        val lines = (stored ?: defaultLongPressSpec(key)).lineSequence()
+        val lines = longPressSpec(context, key).lineSequence()
         return lines.mapNotNull(::parse).toList()
     }
 
