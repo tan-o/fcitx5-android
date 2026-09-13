@@ -9,6 +9,7 @@
 #include <memory>
 #include <future>
 #include <fstream>
+#include <exception>
 
 #include <android/log.h>
 
@@ -366,12 +367,23 @@ public:
 
     std::unique_ptr<fcitx::RawConfig> invokeLua(const std::string &function,
                                                 const fcitx::RawConfig &argument) {
-        auto *ic = p_frontend->call<fcitx::IAndroidFrontend::activeInputContext>();
-        if (!ic) return nullptr;
-        auto *imeapi = p_instance->addonManager().addon("imeapi");
-        if (!imeapi) return nullptr;
-        return std::make_unique<fcitx::RawConfig>(
-                imeapi->call<fcitx::ILuaAddon::invokeLuaFunction>(ic, function, argument));
+        try {
+            auto *ic = p_frontend->call<fcitx::IAndroidFrontend::activeInputContext>();
+            if (!ic) return nullptr;
+            auto *imeapi = p_instance->addonManager().addon("imeapi");
+            if (!imeapi) {
+                __android_log_print(ANDROID_LOG_ERROR, "Fcitx5", "Lua imeapi addon is unavailable");
+                return nullptr;
+            }
+            return std::make_unique<fcitx::RawConfig>(
+                    imeapi->call<fcitx::ILuaAddon::invokeLuaFunction>(ic, function, argument));
+        } catch (const std::exception &e) {
+            __android_log_print(ANDROID_LOG_ERROR, "Fcitx5", "Lua invocation failed: %s", e.what());
+            return nullptr;
+        } catch (...) {
+            __android_log_print(ANDROID_LOG_ERROR, "Fcitx5", "Lua invocation failed with an unknown error");
+            return nullptr;
+        }
     }
 
     void setClipboard(const std::string &string, bool password) {

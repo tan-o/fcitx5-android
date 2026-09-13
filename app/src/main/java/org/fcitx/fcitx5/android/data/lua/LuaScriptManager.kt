@@ -4,10 +4,14 @@ import org.fcitx.fcitx5.android.utils.appContext
 import java.io.File
 
 object LuaScriptManager {
-    val directory: File = File(
-        requireNotNull(appContext.getExternalFilesDir(null)),
-        "data/lua/imeapi/extensions"
-    ).apply { mkdirs() }
+    val directory: File
+        get() {
+            val external = appContext.getExternalFilesDir(null)
+                ?: error("应用外部存储当前不可用")
+            return File(external, "data/lua/imeapi/extensions").also {
+                check(it.isDirectory || it.mkdirs()) { "无法创建 Lua 脚本目录" }
+            }
+        }
 
     fun list(): List<File> = directory.listFiles()
         ?.filter { it.isFile && it.extension.equals("lua", ignoreCase = true) }

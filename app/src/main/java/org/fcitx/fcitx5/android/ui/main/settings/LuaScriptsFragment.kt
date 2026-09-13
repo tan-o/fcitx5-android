@@ -1,135 +1,159 @@
+/*
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ * SPDX-FileCopyrightText: Copyright 2026 Fcitx5 for Android Contributors
+ */
 package org.fcitx.fcitx5.android.ui.main.settings
 
-import android.app.AlertDialog
 import android.os.Bundle
 import android.text.InputType
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
-import androidx.preference.Preference
-import androidx.preference.PreferenceCategory
+import androidx.activity.OnBackPressedCallback
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.daemon.FcitxDaemon
 import org.fcitx.fcitx5.android.data.lua.LuaScriptManager
-import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
 import java.io.File
 
-class LuaScriptsFragment : PaddingPreferenceFragment() {
-    override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) = rebuild()
+class LuaScriptsFragment : Fragment() {
+    private lateinit var content: LinearLayout
+    private lateinit var backCallback: OnBackPressedCallback
 
-    private fun rebuild() {
-        val ctx = requireContext()
-        preferenceScreen = preferenceManager.createPreferenceScreen(ctx).apply {
-            addPreference(Preference(ctx).apply {
-                title = "使用说明"
-                summary = "脚本保存到 data/lua/imeapi/extensions。定义返回文本的全局函数后，可在按键手势中写：时间=lua:insert_current_time:%Y-%m-%d %H:%M"
-                isSelectable = false
-            })
-            addPreference(Preference(ctx).apply {
-                title = "新建 Lua 脚本"
-                summary = "从可运行的时间插入示例开始"
-                setOnPreferenceClickListener { showNameDialog(); true }
-            })
-            addPreference(PreferenceCategory(ctx).apply {
-                title = "脚本"
-                val files = LuaScriptManager.list()
-                if (files.isEmpty()) {
-                    addPreference(Preference(ctx).apply {
-                        title = "暂无脚本"
-                        isSelectable = false
-                    })
-                } else {
-                    files.forEach { file ->
-                        addPreference(Preference(ctx).apply {
-                            title = file.name
-                            summary = "点击编辑"
-                            setOnPreferenceClickListener { showEditor(file); true }
-                        })
-                    }
-                }
-            })
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        val scroll = ScrollView(requireContext()).apply {
+            isFillViewport = true
         }
+        content = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = dp(20)
+            setPadding(padding, dp(12), padding, dp(24))
+        }
+        scroll.addView(content, ViewGroup.LayoutParams(-1, -2))
+        backCallback = object : OnBackPressedCallback(false) {
+            override fun handleOnBackPressed() = showList()
+        }
+        showList()
+        return scroll
     }
 
-    private fun showNameDialog() {
-        val ctx = requireContext()
-        val name = EditText(ctx).apply {
-            hint = "例如 custom_tools"
-            inputType = InputType.TYPE_CLASS_TEXT
-            setSingleLine()
-        }
-        val dialog = AlertDialog.Builder(ctx)
-            .setTitle("脚本文件名")
-            .setView(name)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton("下一步", null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                try {
-                    val normalized = LuaScriptManager.normalizeName(name.text.toString())
-                    check(!LuaScriptManager.directory.resolve(normalized).exists()) { "文件已存在" }
-                    dialog.dismiss()
-                    showEditor(null, normalized)
-                } catch (e: Exception) {
-                    name.error = e.message
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backCallback)
+    }
+
+    private fun showList() {
+        backCallback.isEnabled = false
+        content.removeAllViews()
+        content.addView(TextView(requireContext()).apply {
+            text = "脚本由 fcitx5-lua 的 imeapi 加载。手势动作格式：\n时间=lua:insert_current_time:%Y-%m-%d %H:%M"
+            setPadding(0, 0, 0, dp(12))
+        })
+        content.addView(Button(requireContext()).apply {
+            text = "新建 Lua 脚本"
+            setOnClickListener { showEditor(null) }
+        }, LinearLayout.LayoutParams(-1, -2))
+
+        runCatching { LuaScriptManager.list() }
+            .onSuccess { files ->
+                if (files.isEmpty()) {
+                    content.addView(TextView(requireContext()).apply {
+                        text = "暂无脚本"
+                        setPadding(0, dp(18), 0, 0)
+                    })
+                } else files.forEach { file ->
+                    content.addView(Button(requireContext()).apply {
+                        isAllCaps = false
+                        text = file.name
+                        gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                        setOnClickListener { showEditor(file) }
+                    }, LinearLayout.LayoutParams(-1, -2))
                 }
             }
-        }
-        dialog.show()
+            .onFailure(::showFailurePage)
     }
 
-    private fun showEditor(file: File?, newName: String = file?.name.orEmpty()) {
-        val ctx = requireContext()
-        val editor = EditText(ctx).apply {
+    private fun showEditor(file: File?) {
+        backCallback.isEnabled = true
+        content.removeAllViews()
+        val name = EditText(requireContext()).apply {
+            hint = "脚本名，例如 custom_tools"
+            inputType = InputType.TYPE_CLASS_TEXT
+            setSingleLine()
+            setText(file?.name.orEmpty())
+            isEnabled = file == null
+        }
+        val editor = EditText(requireContext()).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or
                 InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             setHorizontallyScrolling(false)
-            minLines = 14
-            setText(file?.readText() ?: LuaScriptManager.TEMPLATE)
-            setSelection(text.length)
+            minLines = 18
+            gravity = Gravity.TOP or Gravity.START
+            setText(runCatching { file?.readText() ?: LuaScriptManager.TEMPLATE }
+                .getOrElse { "-- 读取失败：${it.message}" })
         }
-        val container = LinearLayout(ctx).apply {
-            val padding = (20 * resources.displayMetrics.density).toInt()
-            setPadding(padding, 0, padding, 0)
-            addView(editor, LinearLayout.LayoutParams(-1, -2))
-        }
-        val builder = AlertDialog.Builder(ctx)
-            .setTitle(newName)
-            .setView(container)
-            .setNegativeButton(android.R.string.cancel, null)
-            .setPositiveButton("保存", null)
-        if (file != null) builder.setNeutralButton("删除", null)
-        val dialog = builder.create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                try {
-                    LuaScriptManager.save(newName, editor.text.toString())
-                    FcitxDaemon.restartFcitx()
-                    dialog.dismiss()
-                    rebuild()
-                    Toast.makeText(ctx, "已保存并重新加载 Lua", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Toast.makeText(ctx, e.message, Toast.LENGTH_LONG).show()
-                }
+        content.addView(name, LinearLayout.LayoutParams(-1, -2))
+        content.addView(editor, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+        content.addView(Button(requireContext()).apply {
+            text = "保存并重新加载"
+            setOnClickListener {
+                val fileName = if (file == null) name.text.toString() else file.name
+                saveAndReload(fileName, editor.text.toString())
             }
-            if (file != null) {
-                dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
-                    AlertDialog.Builder(ctx)
-                        .setTitle("删除 ${file.name}？")
-                        .setNegativeButton(android.R.string.cancel, null)
-                        .setPositiveButton(android.R.string.ok) { _, _ ->
-                            try {
-                                LuaScriptManager.delete(file)
-                                FcitxDaemon.restartFcitx()
-                                dialog.dismiss()
-                                rebuild()
-                            } catch (e: Exception) {
-                                Toast.makeText(ctx, e.message, Toast.LENGTH_LONG).show()
-                            }
-                        }.show()
-                }
-            }
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        if (file != null) {
+            content.addView(Button(requireContext()).apply {
+                text = "删除"
+                setOnClickListener { deleteAndReload(file) }
+            }, LinearLayout.LayoutParams(-1, -2))
         }
-        dialog.show()
     }
+
+    private fun saveAndReload(name: String, source: String) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { LuaScriptManager.save(name, source) }
+                FcitxDaemon.restartFcitx()
+            }.onSuccess {
+                Toast.makeText(requireContext(), "已保存并重新加载 Lua", Toast.LENGTH_SHORT).show()
+                showList()
+            }.onFailure(::showError)
+        }
+    }
+
+    private fun deleteAndReload(file: File) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { LuaScriptManager.delete(file) }
+                FcitxDaemon.restartFcitx()
+            }.onSuccess { showList() }.onFailure(::showError)
+        }
+    }
+
+    private fun showFailurePage(error: Throwable) {
+        content.addView(TextView(requireContext()).apply {
+            text = "Lua 脚本目录不可用：${error.message ?: error.javaClass.simpleName}"
+            setPadding(0, dp(18), 0, 0)
+        })
+    }
+
+    private fun showError(error: Throwable) {
+        Toast.makeText(requireContext(), error.message ?: "Lua 操作失败", Toast.LENGTH_LONG).show()
+    }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

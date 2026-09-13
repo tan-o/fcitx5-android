@@ -5,6 +5,7 @@
 
 package org.fcitx.fcitx5.android.input.keyboard
 
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -113,9 +114,19 @@ class CommonKeyActionListener :
                 }
                 is LuaAction -> service.postFcitxJob {
                     commitAndReset()
-                    val text = invokeLua(action.function, action.argument)?.value.orEmpty()
+                    val text = runCatching {
+                        invokeLua(action.function, action.argument)?.value.orEmpty()
+                    }.getOrDefault("")
                     if (text.isNotEmpty()) {
                         service.lifecycleScope.launch { service.commitText(text) }
+                    } else {
+                        service.lifecycleScope.launch {
+                            Toast.makeText(
+                                service,
+                                "Lua 没有返回文本，请检查函数名和脚本",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 }
                 is QuickPhraseAction -> service.postFcitxJob {
