@@ -32,6 +32,7 @@ class UpSwipeSettingsFragment : Fragment() {
         val type: Spinner,
         val character: EditText,
         val function: Spinner,
+        val displayName: EditText,
         val argument: EditText,
         val remove: Button,
         val functionOffset: Int
@@ -207,9 +208,16 @@ class UpSwipeSettingsFragment : Fragment() {
             hint = "函数参数（可选）"
             setText(currentLua?.argument.orEmpty())
         }
+        val displayName = EditText(requireContext()).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setSingleLine()
+            hint = "显示名称（留空使用函数名）"
+            if (currentLua != null) setText(entry?.label.orEmpty())
+        }
         val root = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             addView(row, LinearLayout.LayoutParams(-1, -2))
+            addView(displayName, LinearLayout.LayoutParams(-1, -2))
             addView(argument, LinearLayout.LayoutParams(-1, -2))
             setPadding(0, 0, 0, dp(6))
         }
@@ -217,9 +225,11 @@ class UpSwipeSettingsFragment : Fragment() {
             value.removeAllViews()
             if (position == 0) {
                 value.addView(character, LinearLayout.LayoutParams(-1, -2))
+                displayName.visibility = View.GONE
                 argument.visibility = View.GONE
             } else {
                 value.addView(function, LinearLayout.LayoutParams(-1, -2))
+                displayName.visibility = View.VISIBLE
                 argument.visibility = View.VISIBLE
             }
         }
@@ -231,7 +241,9 @@ class UpSwipeSettingsFragment : Fragment() {
         }
         type.setSelection(if (currentLua == null) 0 else 1)
         renderType(type.selectedItemPosition)
-        return ActionEditor(root, type, character, function, argument, remove, functionOffset)
+        return ActionEditor(
+            root, type, character, function, displayName, argument, remove, functionOffset
+        )
     }
 
     private fun encode(
@@ -242,8 +254,10 @@ class UpSwipeSettingsFragment : Fragment() {
         val selected = editor.function.selectedItemPosition - editor.functionOffset
         check(selected in functions.indices) { "所选 Lua 函数未在脚本中检测到" }
         val name = functions[selected].name
+        val displayName = editor.displayName.text.toString().trim().ifEmpty { name }
+        require('=' !in displayName && '\n' !in displayName) { "显示名称不能包含等号或换行" }
         val argument = editor.argument.text.toString()
-        return "$name=lua:$name${if (argument.isEmpty()) "" else ":$argument"}"
+        return "$displayName=lua:$name${if (argument.isEmpty()) "" else ":$argument"}"
     }
 
     private fun label(value: String) = TextView(requireContext()).apply {

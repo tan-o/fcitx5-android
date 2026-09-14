@@ -22,6 +22,26 @@ import java.io.File
 import java.net.URI
 import java.security.MessageDigest
 
+private fun yaml(allowDuplicateKeys: Boolean = false) = Yaml(
+    SafeConstructor(LoaderOptions().apply {
+        codePointLimit = 2_000_000
+        isAllowDuplicateKeys = allowDuplicateKeys
+    })
+)
+
+internal fun repositorySchemaId(text: String): String? {
+    val data = yaml(allowDuplicateKeys = true).load<Map<String, Any?>>(text)
+    val schema = data["schema"] as? Map<*, *> ?: return null
+    return schema["schema_id"]?.toString()
+}
+
+internal fun repositorySchemaList(text: String): List<String> {
+    val data = yaml(allowDuplicateKeys = true).load<Map<String, Any?>>(text)
+    return (data["schema_list"] as? Collection<*>)?.mapNotNull { entry ->
+        (entry as? Map<*, *>)?.get("schema")?.toString()
+    }.orEmpty()
+}
+
 object RimeManager {
     data class GitProgress(val task: String, val completed: Int, val total: Int)
 
@@ -29,7 +49,6 @@ object RimeManager {
     val repositories = File(appContext.filesDir, "rime-repositories").apply { mkdirs() }
     val userDir: File get() = File(requireNotNull(FcitxApplication.getInstance().directBootAwareContext.getExternalFilesDir(null)), "data/rime").apply { mkdirs() }
     private val sharedDir get() = File(DataManager.dataDir, "usr/share/rime-data")
-    private fun yaml() = Yaml(SafeConstructor(LoaderOptions().apply { codePointLimit = 2_000_000; isAllowDuplicateKeys = false }))
     fun repositoryFor(url: String): File {
         val uri = URI(url.trim())
         require(uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null) {
@@ -122,17 +141,15 @@ object RimeManager {
             val schemaFiles = files.filter { it.parentFile == root && it.name.endsWith(".schema.yaml") }
             check(schemaFiles.isNotEmpty()) { "仓库根目录中没有 Rime schema 文件" }
             val schemaIdsByFile = schemaFiles.associate { file ->
-                val data = yaml().load<Map<String, Any?>>(file.readText())
-                val schema = data["schema"] as? Map<*, *> ?: error("${file.name} 缺少 schema 配置")
-                val schemaId = schema["schema_id"]?.toString()?.takeIf { it.matches(Regex("[A-Za-z0-9_-]+")) }
+                // Match librime's permissive handling for third-party schemas. Files created or
+                // edited by this app still use strict parsing through yaml().
+                val schemaId = repositorySchemaId(file.readText())
+                    ?.takeIf { it.matches(Regex("[A-Za-z0-9_-]+")) }
                     ?: error("${file.name} 缺少有效的 schema_id")
                 file.name to schemaId
             }
             val configuredSchemas = File(root, "default.yaml").takeIf(File::isFile)?.let { defaultFile ->
-                val data = yaml().load<Map<String, Any?>>(defaultFile.readText())
-                (data["schema_list"] as? Collection<*>)?.mapNotNull { entry ->
-                    (entry as? Map<*, *>)?.get("schema")?.toString()
-                }.orEmpty()
+                repositorySchemaList(defaultFile.readText())
             }.orEmpty()
             val availableSchemas = schemaIdsByFile.values.distinct()
             val schemaIds = configuredSchemas.filter(availableSchemas::contains).distinct()
