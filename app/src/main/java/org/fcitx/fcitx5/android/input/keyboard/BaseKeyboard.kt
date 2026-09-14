@@ -226,7 +226,7 @@ abstract class BaseKeyboard(
                                 true
                             } else {
                                 val count = event.countX
-                                if (count < 0) {
+                                if (count != 0) {
                                     onAction(KeyAction.MoveSelectionAction(count))
                                     if (hapticOnRepeat) InputFeedbacks.hapticFeedback(view)
                                     true
@@ -237,7 +237,7 @@ abstract class BaseKeyboard(
                             if (deleteAll) {
                                 onAction(KeyAction.DeleteAllAction)
                                 true
-                            } else if (event.totalX < 0) {
+                            } else if (event.totalX != 0) {
                                 onAction(KeyAction.DeleteSelectionAction(event.totalX))
                                 true
                             } else false
