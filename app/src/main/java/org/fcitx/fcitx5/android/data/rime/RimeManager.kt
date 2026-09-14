@@ -14,15 +14,11 @@ import org.fcitx.fcitx5.android.utils.appContext
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.constructor.SafeConstructor
-import timber.log.Timber
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
 
 object RimeManager {
-    private const val CALCULATOR_TRANSLATOR = "lua_translator@*fcitx_calculator"
-    private const val CALCULATOR_TRANSLATORS_PATCH = "engine/translators/+"
-    private const val CALCULATOR_PATTERN_PATCH = "recognizer/patterns/fcitx_calculator"
     private val lock = Mutex()
     val repositories = File(appContext.filesDir, "rime-repositories").apply { mkdirs() }
     val userDir: File get() = File(requireNotNull(FcitxApplication.getInstance().directBootAwareContext.getExternalFilesDir(null)), "data/rime").apply { mkdirs() }
@@ -92,39 +88,6 @@ object RimeManager {
     }
     fun schemas(): List<String> = (userDir.listFiles().orEmpty().toList() + sharedDir.listFiles().orEmpty().toList())
         .filter { it.name.endsWith(".schema.yaml") }.map { it.name.removeSuffix(".schema.yaml") }.distinct().sorted()
-
-    /** Install the calculator as a normal Rime translator for every available schema. */
-    fun prepareBuiltInFeatures() {
-        schemas().forEach { schema ->
-            runCatching {
-                val file = customFile("$schema.custom.yaml")
-                val data = if (file.exists()) {
-                    yaml().load<Map<String, Any?>>(file.readText()).toMutableMap()
-                } else {
-                    linkedMapOf<String, Any?>("patch" to linkedMapOf<String, Any?>())
-                }
-                @Suppress("UNCHECKED_CAST")
-                val patch = (data["patch"] as? Map<String, Any?>)?.toMutableMap()
-                    ?: error("${file.name} 的 patch 必须是映射")
-                val translators = when (val current = patch[CALCULATOR_TRANSLATORS_PATCH]) {
-                    null -> mutableListOf()
-                    is Collection<*> -> current.toMutableList()
-                    else -> error("${file.name} 的 $CALCULATOR_TRANSLATORS_PATCH 必须是列表")
-                }
-                if (CALCULATOR_TRANSLATOR !in translators) translators += CALCULATOR_TRANSLATOR
-                patch[CALCULATOR_TRANSLATORS_PATCH] = translators
-                patch[CALCULATOR_PATTERN_PATCH] = "^=.*$"
-                data["patch"] = patch
-                val output = Yaml().dump(data)
-                if (!file.exists() || file.readText() != output) {
-                    val temporary = File(file.parentFile, file.name + ".saving")
-                    temporary.writeText(output)
-                    if (file.exists()) check(file.delete()) { "无法更新 ${file.name}" }
-                    check(temporary.renameTo(file)) { "无法保存 ${file.name}" }
-                }
-            }.onFailure { Timber.e(it, "Failed to enable Rime calculator for %s", schema) }
-        }
-    }
 
     suspend fun setModel(schema: String, enabled: Boolean) = withContext(Dispatchers.IO) {
         check(!enabled || WanxiangModel.installed) { "请先下载万象模型" }
