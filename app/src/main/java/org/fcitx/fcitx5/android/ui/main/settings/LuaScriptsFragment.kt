@@ -59,8 +59,10 @@ class LuaScriptsFragment : Fragment() {
     private fun showList() {
         backCallback.isEnabled = false
         content.removeAllViews()
+        val scriptPath = runCatching { LuaScriptManager.directory.absolutePath }
+            .getOrDefault("Android/data/应用包名/files/data/lua/imeapi/extensions")
         content.addView(TextView(requireContext()).apply {
-            text = "脚本由 fcitx5-lua 的 imeapi 加载。手势动作格式：\n时间=lua:insert_current_time:%Y-%m-%d %H:%M"
+            text = "脚本由 fcitx5-lua 的 imeapi 加载。\n脚本目录：$scriptPath"
             setPadding(0, 0, 0, dp(12))
         })
         content.addView(Button(requireContext()).apply {

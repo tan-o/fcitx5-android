@@ -3,16 +3,20 @@ package org.fcitx.fcitx5.android.ui.main.settings
 import android.os.Bundle
 import android.text.InputType
 import android.widget.EditText
-import android.widget.ScrollView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import android.app.AlertDialog
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.data.rime.RimeManager
@@ -23,6 +27,12 @@ import org.fcitx.fcitx5.android.utils.addPreference
 import java.io.File
 
 class RimeSettingsFragment : PaddingPreferenceFragment() {
+    private data class ProgressUi(
+        val dialog: AlertDialog,
+        val bar: ProgressBar,
+        val message: TextView
+    )
+
     private lateinit var status: Preference
     private lateinit var repos: PreferenceCategory
     private lateinit var custom: PreferenceCategory
@@ -38,6 +48,107 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
             finally { preferenceScreen.isEnabled = true }
         }
     }
+
+    private fun progressUi(title: String, button: String): ProgressUi {
+        val ctx = requireContext()
+        val message = TextView(ctx).apply {
+            text = "准备中…"
+            setPadding(0, 0, 0, dp(10))
+        }
+        val bar = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
+            isIndeterminate = true
+        }
+        val panel = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            val padding = dp(24)
+            setPadding(padding, dp(12), padding, 0)
+            addView(message, LinearLayout.LayoutParams(-1, -2))
+            addView(bar, LinearLayout.LayoutParams(-1, dp(8)))
+        }
+        val dialog = AlertDialog.Builder(ctx).setTitle(title).setView(panel)
+            .setNegativeButton(button, null).create()
+        return ProgressUi(dialog, bar, message)
+    }
+
+    private fun runGitOperation(
+        title: String,
+        block: suspend ((RimeManager.GitProgress) -> Unit) -> Unit
+    ) {
+        val ui = progressUi(title, "取消")
+        val update: (RimeManager.GitProgress) -> Unit = { value ->
+            ui.message.post {
+                ui.message.text = value.task.ifBlank { "处理中…" }
+                ui.bar.isIndeterminate = value.total <= 0
+                if (value.total > 0) {
+                    ui.bar.max = value.total
+                    ui.bar.progress = value.completed.coerceIn(0, value.total)
+                }
+            }
+        }
+        val job = lifecycleScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                block(update)
+                status.summary = "完成"
+                refresh()
+                ui.dialog.dismiss()
+            } catch (e: CancellationException) {
+                status.summary = "操作已取消"
+            } catch (e: Exception) {
+                status.summary = e.message ?: e.javaClass.simpleName
+                ui.message.text = status.summary
+                ui.bar.isIndeterminate = false
+                ui.bar.progress = 0
+            } finally {
+                preferenceScreen.isEnabled = true
+            }
+        }
+        preferenceScreen.isEnabled = false
+        ui.dialog.setOnShowListener {
+            ui.dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+                job.cancel()
+                ui.dialog.dismiss()
+            }
+        }
+        ui.dialog.setOnCancelListener { job.cancel() }
+        ui.dialog.show()
+        job.start()
+    }
+
+    private fun showModelDownload() {
+        val ctx = requireContext()
+        org.fcitx.fcitx5.android.data.download.ModelDownloadWorker.enqueue("wanxiang")
+        val ui = progressUi("万象模型", "后台运行")
+        var observer: Job? = null
+        ui.dialog.setOnShowListener {
+            observer = lifecycleScope.launch {
+                WorkManager.getInstance(ctx).getWorkInfosForUniqueWorkFlow("model-wanxiang").collect { rows ->
+                    val active = rows.firstOrNull { !it.state.isFinished }
+                    if (active != null) {
+                        val received = active.progress.getLong("received", 0)
+                        val total = active.progress.getLong("total", 0)
+                        ui.message.text = active.progress.getString("text") ?: "等待联网后开始"
+                        ui.bar.isIndeterminate = total <= 0
+                        if (total > 0) {
+                            ui.bar.max = 1000
+                            ui.bar.progress = (received * 1000 / total).toInt().coerceIn(0, 1000)
+                        }
+                    } else if (rows.isNotEmpty()) {
+                        val failed = rows.firstOrNull {
+                            it.state == WorkInfo.State.FAILED || it.state == WorkInfo.State.CANCELLED
+                        }
+                        ui.message.text = if (WanxiangModel.installed) "模型已安装" else
+                            failed?.outputData?.getString("text") ?: "下载失败，重新点击可续传"
+                        ui.bar.isIndeterminate = false
+                        ui.bar.max = 1000
+                        ui.bar.progress = if (WanxiangModel.installed) 1000 else 0
+                        refresh()
+                    }
+                }
+            }
+        }
+        ui.dialog.setOnDismissListener { observer?.cancel() }
+        ui.dialog.show()
+    }
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val ctx = requireContext()
         preferenceScreen = preferenceManager.createPreferenceScreen(ctx).apply {
@@ -46,7 +157,13 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
             addPreference("Clone 方案仓库") {
                 val input = EditText(ctx).apply { hint = "https://github.com/用户/仓库.git"; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI }
                 AlertDialog.Builder(ctx).setTitle("Clone 公开仓库").setView(input)
-                    .setPositiveButton("Clone") { _, _ -> runOperation { RimeManager.clone(input.text.toString()) } }
+                    .setPositiveButton("Clone") { _, _ ->
+                        runGitOperation("Clone 并启用方案") { progress ->
+                            val repo = RimeManager.clone(input.text.toString(), progress)
+                            progress(RimeManager.GitProgress("正在部署并启用方案", 0, 0))
+                            RimeManager.deploy(repo)
+                        }
+                    }
                     .setNegativeButton(android.R.string.cancel, null).show()
             }
             addPreference("新建 .custom.yaml") {
@@ -72,8 +189,7 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
                 addPreference(modelStatus)
                 modelDownload = Preference(ctx).apply {
                     setOnPreferenceClickListener {
-                        org.fcitx.fcitx5.android.data.download.ModelDownloadWorker.enqueue("wanxiang")
-                        status.summary = "已加入后台下载；通知栏查看进度。网络中断自动续传，暂停后点击下载继续。"
+                        showModelDownload()
                         true
                     }
                 }
@@ -116,7 +232,11 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
                     .setItems(arrayOf("部署此方案（保留 custom 文件）", "从远端更新", "删除仓库")) { _, index ->
                         when (index) {
                             0 -> runOperation { RimeManager.deploy(repo) }
-                            1 -> runOperation { RimeManager.update(repo) }
+                            1 -> runGitOperation("更新并重新部署") { progress ->
+                                RimeManager.update(repo, progress)
+                                progress(RimeManager.GitProgress("正在重新部署", 0, 0))
+                                RimeManager.deploy(repo)
+                            }
                             2 -> AlertDialog.Builder(requireContext()).setMessage("删除克隆的仓库？已部署的方案和自定义文件保留。")
                                 .setPositiveButton("删除") { _, _ -> runOperation { withContext(Dispatchers.IO) { check(repo.deleteRecursively()) } } }
                                 .setNegativeButton(android.R.string.cancel, null).show()
@@ -196,4 +316,6 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
             dialog.show()
         }
     }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

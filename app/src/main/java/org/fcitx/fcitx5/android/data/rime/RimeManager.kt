@@ -1,11 +1,15 @@
 package org.fcitx.fcitx5.android.data.rime
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.MergeCommand.FastForwardMode
+import org.eclipse.jgit.lib.ProgressMonitor
 import org.eclipse.jgit.util.FS
 import org.fcitx.fcitx5.android.FcitxApplication
 import org.fcitx.fcitx5.android.core.data.DataManager
@@ -19,12 +23,44 @@ import java.net.URI
 import java.security.MessageDigest
 
 object RimeManager {
+    data class GitProgress(val task: String, val completed: Int, val total: Int)
+
     private val lock = Mutex()
     val repositories = File(appContext.filesDir, "rime-repositories").apply { mkdirs() }
     val userDir: File get() = File(requireNotNull(FcitxApplication.getInstance().directBootAwareContext.getExternalFilesDir(null)), "data/rime").apply { mkdirs() }
     private val sharedDir get() = File(DataManager.dataDir, "usr/share/rime-data")
     private fun yaml() = Yaml(SafeConstructor(LoaderOptions().apply { codePointLimit = 2_000_000; isAllowDuplicateKeys = false }))
-    suspend fun clone(url: String): File = withContext(Dispatchers.IO) {
+    private fun progressMonitor(
+        job: Job?,
+        listener: (GitProgress) -> Unit
+    ) = object : ProgressMonitor {
+        private var task = "连接远端"
+        private var completed = 0
+        private var total = ProgressMonitor.UNKNOWN
+
+        override fun start(totalTasks: Int) = Unit
+        override fun beginTask(title: String, totalWork: Int) {
+            task = title
+            completed = 0
+            total = totalWork
+            listener(GitProgress(task, completed, total))
+        }
+        override fun update(delta: Int) {
+            completed += delta
+            listener(GitProgress(task, completed, total))
+        }
+        override fun endTask() {
+            if (total > 0) completed = total
+            listener(GitProgress(task, completed, total))
+        }
+        override fun isCancelled() = job?.isActive == false
+        override fun showDuration(enabled: Boolean) = Unit
+    }
+
+    suspend fun clone(
+        url: String,
+        progress: (GitProgress) -> Unit = {}
+    ): File = withContext(Dispatchers.IO) {
         lock.withLock {
             val uri = URI(url.trim())
             require(uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null) { "请输入公开仓库的 HTTPS Git 地址" }
@@ -33,16 +69,29 @@ object RimeManager {
             val hash = MessageDigest.getInstance("SHA-256").digest(url.toByteArray()).take(4).joinToString("") { "%02x".format(it) }
             val dir = File(repositories, "$name-$hash")
             check(!dir.exists()) { "仓库已存在" }
-            try { Git.cloneRepository().setURI(url.trim()).setDirectory(dir).setTimeout(120).call().close() }
+            val job = currentCoroutineContext()[Job]
+            try {
+                Git.cloneRepository().setURI(url.trim()).setDirectory(dir).setTimeout(120)
+                    .setProgressMonitor(progressMonitor(job, progress)).call().close()
+                currentCoroutineContext().ensureActive()
+            }
             catch (e: Exception) { dir.deleteRecursively(); throw e }
             dir
         }
     }
-    suspend fun update(repo: File) = withContext(Dispatchers.IO) {
+    suspend fun update(
+        repo: File,
+        progress: (GitProgress) -> Unit = {}
+    ) = withContext(Dispatchers.IO) {
         lock.withLock {
+            val job = currentCoroutineContext()[Job]
             Git.open(repo).use { git ->
                 check(git.status().call().isClean) { "仓库有未提交的修改，请先处理；个人设置应写入 custom 文件" }
-                check(git.pull().setFastForward(FastForwardMode.FF_ONLY).setTimeout(120).call().isSuccessful) { "更新失败：远端分支已分叉" }
+                check(git.pull().setFastForward(FastForwardMode.FF_ONLY).setTimeout(120)
+                    .setProgressMonitor(progressMonitor(job, progress)).call().isSuccessful) {
+                    "更新失败：远端分支已分叉"
+                }
+                currentCoroutineContext().ensureActive()
             }
         }
     }
@@ -54,7 +103,24 @@ object RimeManager {
                 check(!java.nio.file.Files.isSymbolicLink(it.toPath())) { "方案不能包含目录链接" }
                 it == root || !it.name.startsWith('.')
             }.filter { it.isFile && !it.name.endsWith(".custom.yaml") && !it.name.startsWith('.') }.toList()
-            check(files.any { it.parentFile == root && it.name.endsWith(".schema.yaml") }) { "仓库根目录中没有 Rime schema 文件" }
+            val schemaFiles = files.filter { it.parentFile == root && it.name.endsWith(".schema.yaml") }
+            check(schemaFiles.isNotEmpty()) { "仓库根目录中没有 Rime schema 文件" }
+            val schemaIdsByFile = schemaFiles.associate { file ->
+                val data = yaml().load<Map<String, Any?>>(file.readText())
+                val schema = data["schema"] as? Map<*, *> ?: error("${file.name} 缺少 schema 配置")
+                val schemaId = schema["schema_id"]?.toString()?.takeIf { it.matches(Regex("[A-Za-z0-9_-]+")) }
+                    ?: error("${file.name} 缺少有效的 schema_id")
+                file.name to schemaId
+            }
+            val configuredSchemas = File(root, "default.yaml").takeIf(File::isFile)?.let { defaultFile ->
+                val data = yaml().load<Map<String, Any?>>(defaultFile.readText())
+                (data["schema_list"] as? Collection<*>)?.mapNotNull { entry ->
+                    (entry as? Map<*, *>)?.get("schema")?.toString()
+                }.orEmpty()
+            }.orEmpty()
+            val availableSchemas = schemaIdsByFile.values.distinct()
+            val schemaIds = configuredSchemas.filter(availableSchemas::contains).distinct()
+                .ifEmpty { availableSchemas }
             files.forEach { file ->
                 check(file.canonicalPath.startsWith(root.path + File.separator)) { "方案包含目录外的链接" }
             }
@@ -68,6 +134,7 @@ object RimeManager {
                 if (destination.exists()) check(destination.delete()) { "无法替换 ${source.name}" }
                 check(temporary.renameTo(destination)) { "无法安装 ${source.name}" }
             }
+            enableSchemas(schemaIds)
             redeploy()
         }
     }
@@ -83,8 +150,35 @@ object RimeManager {
             val file = customFile(name)
             val temporary = File(file.parentFile, file.name + ".saving")
             temporary.writeText(text)
+            if (file.exists()) check(file.delete()) { "无法替换 ${file.name}" }
             check(temporary.renameTo(file)) { "保存失败" }
         }
+    }
+
+    private fun enableSchemas(schemaIds: List<String>) {
+        val file = customFile("default.custom.yaml")
+        val data = if (file.exists()) {
+            yaml().load<Map<String, Any?>>(file.readText()).toMutableMap()
+        } else linkedMapOf<String, Any?>("patch" to linkedMapOf<String, Any?>())
+        @Suppress("UNCHECKED_CAST")
+        val patch = (data["patch"] as? Map<String, Any?>)?.toMutableMap()
+            ?: error("default.custom.yaml 的 patch 必须是映射")
+        val key = "schema_list/+"
+        val entries = when (val current = patch[key]) {
+            null -> mutableListOf<Any?>()
+            is Collection<*> -> current.toMutableList()
+            else -> error("default.custom.yaml 的 $key 必须是列表")
+        }
+        val existing = entries.mapNotNull { (it as? Map<*, *>)?.get("schema")?.toString() }.toSet()
+        val missing = schemaIds.filterNot(existing::contains)
+        if (missing.isEmpty()) return
+        missing.forEach { entries += linkedMapOf("schema" to it) }
+        patch[key] = entries
+        data["patch"] = patch
+        val temporary = File(file.parentFile, file.name + ".saving")
+        temporary.writeText(Yaml().dump(data))
+        if (file.exists()) check(file.delete()) { "无法替换 ${file.name}" }
+        check(temporary.renameTo(file)) { "无法保存 ${file.name}" }
     }
     fun schemas(): List<String> = (userDir.listFiles().orEmpty().toList() + sharedDir.listFiles().orEmpty().toList())
         .filter { it.name.endsWith(".schema.yaml") }.map { it.name.removeSuffix(".schema.yaml") }.distinct().sorted()

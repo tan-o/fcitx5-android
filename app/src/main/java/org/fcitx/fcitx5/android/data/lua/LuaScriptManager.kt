@@ -4,6 +4,8 @@ import org.fcitx.fcitx5.android.utils.appContext
 import java.io.File
 
 object LuaScriptManager {
+    data class FunctionInfo(val name: String, val file: File)
+
     val directory: File
         get() {
             val external = appContext.getExternalFilesDir(null)
@@ -17,6 +19,23 @@ object LuaScriptManager {
         ?.filter { it.isFile && it.extension.equals("lua", ignoreCase = true) }
         ?.sortedBy { it.name.lowercase() }
         .orEmpty()
+
+    /** Only global functions can be invoked through fcitx.call_by_name. */
+    fun functions(): List<FunctionInfo> {
+        return list().flatMap { file ->
+            functionNames(file.readText()).map { FunctionInfo(it, file) }
+        }.distinctBy { it.name }.sortedBy { it.name.lowercase() }
+    }
+
+    internal fun functionNames(source: String): List<String> {
+        val declarations = Regex("(?m)^\\s*function\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*\\(")
+        val assignments = Regex("(?m)^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*function\\s*\\(")
+        return (declarations.findAll(source).map { it.groupValues[1] } +
+            assignments.findAll(source).map { it.groupValues[1] })
+            .distinct()
+            .sorted()
+            .toList()
+    }
 
     fun normalizeName(raw: String): String {
         val base = raw.trim().removeSuffix(".lua")
