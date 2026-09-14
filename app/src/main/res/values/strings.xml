@@ -186,7 +186,7 @@
     <string name="long_press_key">%1$s key choices</string>
     <string name="long_press_action_summary">One choice per line</string>
     <string name="gesture_action_syntax_title">Action format</string>
-    <string name="gesture_action_syntax">Plain text inserts itself. Optional label=action forms: Time=datetime:yyyy-MM-dd HH:mm; Script=lua:function:argument; Quick phrase=fcitx:quickphrase; Unicode=fcitx:unicode; Emoji=fcitx:emoji; Symbols=fcitx:symbols; Next input method=fcitx:next-ime.</string>
+    <string name="gesture_action_syntax">Choose a key, then configure its swipe-up action and long-press choices with the structured editors.</string>
     <string name="disabled">Disabled</string>
     <string name="system_default">System default</string>
     <string name="editor_info_inspector">EditorInfo Inspector</string>

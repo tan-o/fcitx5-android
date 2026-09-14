@@ -27,6 +27,16 @@ import org.fcitx.fcitx5.android.input.keyboard.KeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyGestureActions
 
 class UpSwipeSettingsFragment : Fragment() {
+    private data class ActionEditor(
+        val root: LinearLayout,
+        val type: Spinner,
+        val character: EditText,
+        val function: Spinner,
+        val argument: EditText,
+        val remove: Button,
+        val functionOffset: Int
+    )
+
     private lateinit var content: LinearLayout
     private lateinit var backCallback: OnBackPressedCallback
 
@@ -86,11 +96,67 @@ class UpSwipeSettingsFragment : Fragment() {
             textSize = 22f
             setPadding(0, 0, 0, dp(12))
         })
-        content.addView(label("上划动作"))
-        val current = KeyGestureActions.parse(KeyGestureActions.upSwipeSpec(requireContext(), key))
-        val currentLua = current?.action as? KeyAction.LuaAction
         val functions = runCatching { LuaScriptManager.functions() }.getOrDefault(emptyList())
-        val missingCurrentFunction = currentLua?.takeIf { current ->
+        content.addView(label("上划动作"))
+        val upSwipe = createActionEditor(
+            KeyGestureActions.parse(KeyGestureActions.upSwipeSpec(requireContext(), key)),
+            functions,
+            removable = false
+        )
+        content.addView(upSwipe.root, LinearLayout.LayoutParams(-1, -2))
+
+        content.addView(label("长按候选"))
+        val longPressContainer = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        val longPressEditors = mutableListOf<ActionEditor>()
+        fun addLongPress(entry: KeyGestureActions.Entry?) {
+            val editor = createActionEditor(entry, functions, removable = true)
+            editor.remove.setOnClickListener {
+                longPressEditors.remove(editor)
+                longPressContainer.removeView(editor.root)
+            }
+            longPressEditors += editor
+            longPressContainer.addView(editor.root, LinearLayout.LayoutParams(-1, -2))
+        }
+        KeyGestureActions.longPress(requireContext(), key).forEach(::addLongPress)
+        content.addView(longPressContainer, LinearLayout.LayoutParams(-1, -2))
+        content.addView(Button(requireContext()).apply {
+            text = "＋ 添加一项"
+            setOnClickListener { addLongPress(null) }
+        }, LinearLayout.LayoutParams(-1, -2))
+        content.addView(TextView(requireContext()).apply {
+            val path = runCatching { LuaScriptManager.directory.absolutePath }
+                .getOrDefault("data/lua/imeapi/extensions")
+            text = "函数来自 $path 中的全局 function。"
+            textSize = 12f
+            setPadding(0, dp(4), 0, dp(8))
+        })
+        content.addView(Button(requireContext()).apply {
+            text = "保存"
+            setOnClickListener {
+                runCatching {
+                    KeyGestureActions.save(
+                        requireContext(),
+                        key,
+                        encode(upSwipe, functions),
+                        longPressEditors.joinToString("\n") { encode(it, functions) }
+                    )
+                }.onSuccess {
+                    Toast.makeText(requireContext(), "已保存", Toast.LENGTH_SHORT).show()
+                    showKeyList()
+                }.onFailure(::showError)
+            }
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
+    }
+
+    private fun createActionEditor(
+        entry: KeyGestureActions.Entry?,
+        functions: List<LuaScriptManager.FunctionInfo>,
+        removable: Boolean
+    ): ActionEditor {
+        val currentLua = entry?.action as? KeyAction.LuaAction
+        val missingCurrent = currentLua?.takeIf { current ->
             functions.none { it.name == current.function }
         }
         val type = Spinner(requireContext()).apply {
@@ -103,12 +169,13 @@ class UpSwipeSettingsFragment : Fragment() {
         val character = EditText(requireContext()).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             setSingleLine()
-            hint = "输入字符或文本；留空关闭"
-            if (currentLua == null) setText((current?.action as? KeyAction.CommitAction)?.text.orEmpty())
+            hint = "输入字符或文本"
+            setText((entry?.action as? KeyAction.CommitAction)?.text.orEmpty())
         }
+        val functionOffset = if (missingCurrent == null) 0 else 1
         val function = Spinner(requireContext()).apply {
             val labels = buildList {
-                if (missingCurrentFunction != null) add("${missingCurrentFunction.function}  ·  未检测到")
+                if (missingCurrent != null) add("${missingCurrent.function}  ·  未检测到")
                 addAll(functions.map { "${it.name}  ·  ${it.file.name}" })
             }
             adapter = ArrayAdapter(
@@ -118,32 +185,34 @@ class UpSwipeSettingsFragment : Fragment() {
             )
             isEnabled = labels.isNotEmpty()
             val selected = functions.indexOfFirst { it.name == currentLua?.function }
-            if (selected >= 0) setSelection(selected + if (missingCurrentFunction == null) 0 else 1)
+            if (selected >= 0) setSelection(selected + functionOffset)
         }
         val value = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
+        }
+        val remove = Button(requireContext()).apply {
+            text = "删除"
+            visibility = if (removable) View.VISIBLE else View.GONE
         }
         val row = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             addView(type, LinearLayout.LayoutParams(0, -2, 0.8f))
-            addView(value, LinearLayout.LayoutParams(0, -2, 1.6f))
+            addView(value, LinearLayout.LayoutParams(0, -2, 1.5f))
+            addView(remove, LinearLayout.LayoutParams(-2, -2))
         }
-        content.addView(row, LinearLayout.LayoutParams(-1, -2))
         val argument = EditText(requireContext()).apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
             setSingleLine()
             hint = "函数参数（可选）"
             setText(currentLua?.argument.orEmpty())
         }
-        content.addView(argument, LinearLayout.LayoutParams(-1, -2))
-        content.addView(TextView(requireContext()).apply {
-            val path = runCatching { LuaScriptManager.directory.absolutePath }
-                .getOrDefault("data/lua/imeapi/extensions")
-            text = "函数来自 $path 中的全局 function。"
-            textSize = 12f
-            setPadding(0, dp(4), 0, dp(8))
-        })
+        val root = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(row, LinearLayout.LayoutParams(-1, -2))
+            addView(argument, LinearLayout.LayoutParams(-1, -2))
+            setPadding(0, 0, 0, dp(6))
+        }
         fun renderType(position: Int) {
             value.removeAllViews()
             if (position == 0) {
@@ -162,38 +231,19 @@ class UpSwipeSettingsFragment : Fragment() {
         }
         type.setSelection(if (currentLua == null) 0 else 1)
         renderType(type.selectedItemPosition)
-        content.addView(label("长按候选（每行一项）"))
-        val longPress = EditText(requireContext()).apply {
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or
-                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            setHorizontallyScrolling(false)
-            minLines = 10
-            gravity = Gravity.TOP or Gravity.START
-            setText(KeyGestureActions.longPressSpec(requireContext(), key))
-        }
-        content.addView(longPress, LinearLayout.LayoutParams(-1, -2))
-        content.addView(Button(requireContext()).apply {
-            text = "保存"
-            setOnClickListener {
-                runCatching {
-                    val upSwipe = if (type.selectedItemPosition == 0) {
-                        character.text.toString()
-                    } else {
-                        val selected = function.selectedItemPosition - if (missingCurrentFunction == null) 0 else 1
-                        check(selected >= 0 && selected < functions.size) { "所选 Lua 函数未在脚本中检测到" }
-                        val name = functions[selected].name
-                        val arg = argument.text.toString()
-                        "$name=lua:$name${if (arg.isEmpty()) "" else ":$arg"}"
-                    }
-                    KeyGestureActions.save(
-                        requireContext(), key, upSwipe, longPress.text.toString()
-                    )
-                }.onSuccess {
-                    Toast.makeText(requireContext(), "已保存", Toast.LENGTH_SHORT).show()
-                    showKeyList()
-                }.onFailure(::showError)
-            }
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
+        return ActionEditor(root, type, character, function, argument, remove, functionOffset)
+    }
+
+    private fun encode(
+        editor: ActionEditor,
+        functions: List<LuaScriptManager.FunctionInfo>
+    ): String {
+        if (editor.type.selectedItemPosition == 0) return editor.character.text.toString()
+        val selected = editor.function.selectedItemPosition - editor.functionOffset
+        check(selected in functions.indices) { "所选 Lua 函数未在脚本中检测到" }
+        val name = functions[selected].name
+        val argument = editor.argument.text.toString()
+        return "$name=lua:$name${if (argument.isEmpty()) "" else ":$argument"}"
     }
 
     private fun label(value: String) = TextView(requireContext()).apply {
