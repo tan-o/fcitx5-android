@@ -57,3 +57,8 @@ install(FILES
         DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data"
         COMPONENT prebuilt-assets
         )
+
+install(FILES "lua/fcitx_calculator.lua"
+        DESTINATION "${FCITX_INSTALL_DATADIR}/rime-data/lua"
+        COMPONENT prebuilt-assets
+        )

@@ -43,12 +43,8 @@ object DeepSeek {
     var prompt: String
         get() = prefs.getString("prompt", DEFAULT_PROMPT)!!
         set(value) { prefs.edit().putString("prompt", value).apply() }
-    var promptPreset: String
-        get() = prefs.getString("prompt_preset", "faithful")!!
-        set(value) { prefs.edit().putString("prompt_preset", value).apply() }
-    private val effectivePrompt: String
-        get() = promptPresets.firstOrNull { it.id == promptPreset }
-            ?.prompt?.takeIf { it.isNotBlank() } ?: prompt
+    val promptPreset: String
+        get() = promptPresets.firstOrNull { it.prompt.isNotBlank() && it.prompt == prompt }?.id ?: "custom"
     private val keyFile get() = File(appContext.noBackupFilesDir, "deepseek-key")
     var model: String
         get() = prefs.getString("model", "")!!
@@ -113,7 +109,7 @@ object DeepSeek {
             .put("model", model).put("stream", false)
             .put("thinking", JSONObject().put("type", "disabled"))
             .put("messages", JSONArray()
-                .put(JSONObject().put("role", "system").put("content", effectivePrompt.replace("{targetLanguage}", target)))
+                .put(JSONObject().put("role", "system").put("content", prompt.replace("{targetLanguage}", target)))
                 .put(JSONObject().put("role", "user").put("content", text))))
         val choice = result.getJSONArray("choices").getJSONObject(0)
         check(choice.getString("finish_reason") == "stop") { "翻译未完整返回，请缩短文本后重试" }

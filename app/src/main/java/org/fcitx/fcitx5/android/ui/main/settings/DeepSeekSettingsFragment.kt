@@ -17,24 +17,33 @@ class DeepSeekSettingsFragment : PaddingPreferenceFragment() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val ctx = requireContext()
         preferenceScreen = preferenceManager.createPreferenceScreen(ctx).apply {
-            addPreference(ListPreference(ctx).apply {
+            lateinit var promptEditor: EditTextPreference
+            val presetEditor = ListPreference(ctx).apply {
                 key = "deepseek_prompt_preset_editor"
-                title = "翻译风格"
+                title = "提示词预设"
                 isPersistent = false
                 entries = DeepSeek.promptPresets.map { it.label }.toTypedArray()
                 entryValues = DeepSeek.promptPresets.map { it.id }.toTypedArray()
                 value = DeepSeek.promptPreset
                 summary = DeepSeek.promptPresets.firstOrNull { it.id == value }?.label
                 setOnPreferenceChangeListener { _, newValue ->
-                    DeepSeek.promptPreset = newValue.toString()
-                    value = newValue.toString()
+                    val preset = DeepSeek.promptPresets.first { it.id == newValue.toString() }
+                    if (preset.prompt.isBlank()) {
+                        promptEditor.performClick()
+                        return@setOnPreferenceChangeListener false
+                    }
+                    DeepSeek.prompt = preset.prompt
+                    promptEditor.text = preset.prompt
+                    promptEditor.summary = preset.prompt
+                    value = DeepSeek.promptPreset
                     summary = DeepSeek.promptPresets.firstOrNull { it.id == value }?.label
                     true
                 }
-            })
-            addPreference(EditTextPreference(ctx).apply {
+            }
+            addPreference(presetEditor)
+            promptEditor = EditTextPreference(ctx).apply {
                 key = "deepseek_prompt_editor"
-                title = "翻译提示词"
+                title = "编辑当前提示词"
                 dialogMessage = "{targetLanguage} 会替换成选择的目标语言。"
                 isPersistent = false
                 text = DeepSeek.prompt
@@ -47,12 +56,14 @@ class DeepSeekSettingsFragment : PaddingPreferenceFragment() {
                     val prompt = value.toString().trim()
                     if (prompt.isBlank()) false else {
                         DeepSeek.prompt = prompt
-                        DeepSeek.promptPreset = "custom"
                         summary = prompt
+                        presetEditor.value = DeepSeek.promptPreset
+                        presetEditor.summary = DeepSeek.promptPresets.first { it.id == DeepSeek.promptPreset }.label
                         true
                     }
                 }
-            })
+            }
+            addPreference(promptEditor)
             addPreference(EditTextPreference(ctx).apply {
                 key = "deepseek_key_editor"
                 title = "API Key"

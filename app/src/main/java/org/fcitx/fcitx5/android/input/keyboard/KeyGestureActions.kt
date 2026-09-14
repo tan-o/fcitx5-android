@@ -62,7 +62,8 @@ object KeyGestureActions {
     }
 
     /**
-     * One action per line. A label may be placed before '='.
+     * One action per line. A label may be placed before '=' when the right side is a command.
+     * Otherwise '=' is committed as ordinary text.
      * Plain text commits itself. Supported commands:
      * text:, datetime:, lua:function[:argument], fcitx:quickphrase,
      * fcitx:unicode, fcitx:emoji, fcitx:symbols and fcitx:next-ime.
@@ -71,7 +72,7 @@ object KeyGestureActions {
         val trimmed = line.trim()
         if (trimmed.isEmpty()) return null
         val separator = trimmed.indexOf('=')
-        val explicitLabel = separator > 0
+        val explicitLabel = separator > 0 && isCommand(trimmed.substring(separator + 1).trim())
         val spec = if (explicitLabel) trimmed.substring(separator + 1).trim() else trimmed
         if (spec.isEmpty()) return null
         val action = when {
@@ -101,4 +102,14 @@ object KeyGestureActions {
         if (label.isEmpty()) return null
         return Entry(label, action)
     }
+
+    private fun isCommand(spec: String): Boolean =
+        spec.startsWith("text:", ignoreCase = true) ||
+            spec.startsWith("datetime:", ignoreCase = true) ||
+            spec.startsWith("lua:", ignoreCase = true) ||
+            spec.equals("fcitx:quickphrase", ignoreCase = true) ||
+            spec.equals("fcitx:unicode", ignoreCase = true) ||
+            spec.equals("fcitx:emoji", ignoreCase = true) ||
+            spec.equals("fcitx:symbols", ignoreCase = true) ||
+            spec.equals("fcitx:next-ime", ignoreCase = true)
 }
