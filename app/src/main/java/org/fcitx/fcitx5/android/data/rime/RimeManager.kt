@@ -30,6 +30,26 @@ object RimeManager {
     val userDir: File get() = File(requireNotNull(FcitxApplication.getInstance().directBootAwareContext.getExternalFilesDir(null)), "data/rime").apply { mkdirs() }
     private val sharedDir get() = File(DataManager.dataDir, "usr/share/rime-data")
     private fun yaml() = Yaml(SafeConstructor(LoaderOptions().apply { codePointLimit = 2_000_000; isAllowDuplicateKeys = false }))
+    fun repositoryFor(url: String): File {
+        val uri = URI(url.trim())
+        require(uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null) {
+            "请输入公开仓库的 HTTPS Git 地址"
+        }
+        val name = uri.path.substringAfterLast('/').removeSuffix(".git")
+            .replace(Regex("[^a-zA-Z0-9_-]"), "_")
+        require(name.isNotBlank()) { "仓库地址缺少名称" }
+        val hash = MessageDigest.getInstance("SHA-256").digest(url.trim().toByteArray())
+            .take(4).joinToString("") { "%02x".format(it) }
+        return File(repositories, "$name-$hash")
+    }
+
+    fun repository(name: String): File {
+        require(name.matches(Regex("[a-zA-Z0-9_-]+"))) { "仓库名称无效" }
+        return File(repositories, name).also {
+            check(it.canonicalFile.parentFile == repositories.canonicalFile) { "仓库路径无效" }
+        }
+    }
+
     private fun progressMonitor(
         job: Job?,
         listener: (GitProgress) -> Unit
@@ -62,12 +82,8 @@ object RimeManager {
         progress: (GitProgress) -> Unit = {}
     ): File = withContext(Dispatchers.IO) {
         lock.withLock {
-            val uri = URI(url.trim())
-            require(uri.scheme == "https" && !uri.host.isNullOrBlank() && uri.userInfo == null) { "请输入公开仓库的 HTTPS Git 地址" }
+            val dir = repositoryFor(url)
             FS.DETECTED.setUserHome(appContext.filesDir)
-            val name = uri.path.substringAfterLast('/').removeSuffix(".git").replace(Regex("[^a-zA-Z0-9_-]"), "_")
-            val hash = MessageDigest.getInstance("SHA-256").digest(url.toByteArray()).take(4).joinToString("") { "%02x".format(it) }
-            val dir = File(repositories, "$name-$hash")
             check(!dir.exists()) { "仓库已存在" }
             val job = currentCoroutineContext()[Job]
             try {

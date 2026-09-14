@@ -14,11 +14,11 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import android.app.AlertDialog
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.fcitx.fcitx5.android.data.rime.RimeGitWorker
 import org.fcitx.fcitx5.android.data.rime.RimeManager
 import org.fcitx.fcitx5.android.data.rime.WanxiangModel
 import org.fcitx.fcitx5.android.ui.common.PaddingPreferenceFragment
@@ -34,6 +34,7 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
     )
 
     private lateinit var status: Preference
+    private lateinit var gitStatus: Preference
     private lateinit var repos: PreferenceCategory
     private lateinit var custom: PreferenceCategory
     private lateinit var modelStatus: Preference
@@ -63,55 +64,49 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
             val padding = dp(24)
             setPadding(padding, dp(12), padding, 0)
             addView(message, LinearLayout.LayoutParams(-1, -2))
-            addView(bar, LinearLayout.LayoutParams(-1, dp(8)))
+            addView(bar, LinearLayout.LayoutParams(-1, dp(14)))
         }
         val dialog = AlertDialog.Builder(ctx).setTitle(title).setView(panel)
             .setNegativeButton(button, null).create()
         return ProgressUi(dialog, bar, message)
     }
 
-    private fun runGitOperation(
-        title: String,
-        block: suspend ((RimeManager.GitProgress) -> Unit) -> Unit
-    ) {
-        val ui = progressUi(title, "取消")
-        val update: (RimeManager.GitProgress) -> Unit = { value ->
-            ui.message.post {
-                ui.message.text = value.task.ifBlank { "处理中…" }
-                ui.bar.isIndeterminate = value.total <= 0
-                if (value.total > 0) {
-                    ui.bar.max = value.total
-                    ui.bar.progress = value.completed.coerceIn(0, value.total)
-                }
-            }
-        }
-        val job = lifecycleScope.launch(start = CoroutineStart.LAZY) {
-            try {
-                block(update)
-                status.summary = "完成"
-                refresh()
-                ui.dialog.dismiss()
-            } catch (e: CancellationException) {
-                status.summary = "操作已取消"
-            } catch (e: Exception) {
-                status.summary = e.message ?: e.javaClass.simpleName
-                ui.message.text = status.summary
-                ui.bar.isIndeterminate = false
-                ui.bar.progress = 0
-            } finally {
-                preferenceScreen.isEnabled = true
-            }
-        }
-        preferenceScreen.isEnabled = false
-        ui.dialog.setOnShowListener {
-            ui.dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
-                job.cancel()
-                ui.dialog.dismiss()
-            }
-        }
-        ui.dialog.setOnCancelListener { job.cancel() }
+    private fun showGitProgress(workName: String, title: String) {
+        val ui = progressUi(title, "后台运行")
         ui.dialog.show()
-        job.start()
+        val observer = lifecycleScope.launch {
+            WorkManager.getInstance(requireContext()).getWorkInfosForUniqueWorkFlow(workName)
+                .collect { rows ->
+                    val info = rows.firstOrNull { !it.state.isFinished } ?: rows.lastOrNull()
+                    if (info == null) {
+                        ui.message.text = "后台任务等待启动"
+                        ui.bar.isIndeterminate = true
+                        return@collect
+                    }
+                    if (!info.state.isFinished) {
+                        val total = info.progress.getInt("total", 0)
+                        val completed = info.progress.getInt("completed", 0)
+                        ui.message.text = info.progress.getString("text") ?: "等待联网后开始"
+                        ui.bar.isIndeterminate = total <= 0
+                        if (total > 0) {
+                            ui.bar.max = total
+                            ui.bar.progress = completed.coerceIn(0, total)
+                        }
+                    } else {
+                        ui.message.text = info.outputData.getString("text") ?: when (info.state) {
+                            WorkInfo.State.SUCCEEDED -> "方案已部署并启用"
+                            WorkInfo.State.CANCELLED -> "任务已取消"
+                            else -> "任务失败"
+                        }
+                        ui.bar.isIndeterminate = false
+                        ui.bar.max = 100
+                        ui.bar.progress = if (info.state == WorkInfo.State.SUCCEEDED) 100 else 0
+                        ui.dialog.getButton(AlertDialog.BUTTON_NEGATIVE).text = "关闭"
+                        refresh()
+                    }
+                }
+        }
+        ui.dialog.setOnDismissListener { observer.cancel() }
     }
 
     private fun showModelDownload() {
@@ -158,14 +153,18 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
                 val input = EditText(ctx).apply { hint = "https://github.com/用户/仓库.git"; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI }
                 AlertDialog.Builder(ctx).setTitle("Clone 公开仓库").setView(input)
                     .setPositiveButton("Clone") { _, _ ->
-                        runGitOperation("Clone 并启用方案") { progress ->
-                            val repo = RimeManager.clone(input.text.toString(), progress)
-                            progress(RimeManager.GitProgress("正在部署并启用方案", 0, 0))
-                            RimeManager.deploy(repo)
-                        }
+                        runCatching { RimeGitWorker.enqueueClone(input.text.toString()) }
+                            .onSuccess { showGitProgress(it, "Clone 并启用方案") }
+                            .onFailure { status.summary = it.message }
                     }
                     .setNegativeButton(android.R.string.cancel, null).show()
             }
+            gitStatus = Preference(ctx).apply {
+                title = "方案后台任务"
+                summary = "等待运行"
+                isVisible = false
+            }
+            addPreference(gitStatus)
             addPreference("新建 .custom.yaml") {
                 val input = EditText(ctx).apply { hint = "luna_pinyin.custom.yaml"; isSingleLine = true }
                 AlertDialog.Builder(ctx).setTitle("文件名").setView(input)
@@ -211,6 +210,28 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
         }
         refresh()
         lifecycleScope.launch {
+            WorkManager.getInstance(ctx).getWorkInfosByTagFlow(RimeGitWorker.TAG).collect { rows ->
+                val info = rows.firstOrNull { !it.state.isFinished } ?: rows.lastOrNull()
+                gitStatus.isVisible = info != null
+                if (info != null) {
+                    val workName = RimeGitWorker.workName(info.tags)
+                    gitStatus.summary = if (info.state.isFinished) {
+                        info.outputData.getString("text") ?: when (info.state) {
+                            WorkInfo.State.SUCCEEDED -> "方案已部署并启用"
+                            WorkInfo.State.CANCELLED -> "任务已取消"
+                            else -> "任务失败"
+                        }
+                    } else {
+                        info.progress.getString("text") ?: "等待联网后开始"
+                    }
+                    gitStatus.setOnPreferenceClickListener {
+                        if (workName != null) showGitProgress(workName, "Rime 方案后台任务")
+                        true
+                    }
+                }
+            }
+        }
+        lifecycleScope.launch {
             WorkManager.getInstance(ctx).getWorkInfosForUniqueWorkFlow("model-wanxiang").collect { rows ->
                 val active = rows.firstOrNull { !it.state.isFinished }
                 if (active != null) status.summary = active.progress.getString("text") ?: "后台任务等待运行／联网后续传"
@@ -232,11 +253,9 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
                     .setItems(arrayOf("部署此方案（保留 custom 文件）", "从远端更新", "删除仓库")) { _, index ->
                         when (index) {
                             0 -> runOperation { RimeManager.deploy(repo) }
-                            1 -> runGitOperation("更新并重新部署") { progress ->
-                                RimeManager.update(repo, progress)
-                                progress(RimeManager.GitProgress("正在重新部署", 0, 0))
-                                RimeManager.deploy(repo)
-                            }
+                            1 -> runCatching { RimeGitWorker.enqueueUpdate(repo.name) }
+                                .onSuccess { showGitProgress(it, "更新并重新部署") }
+                                .onFailure { status.summary = it.message }
                             2 -> AlertDialog.Builder(requireContext()).setMessage("删除克隆的仓库？已部署的方案和自定义文件保留。")
                                 .setPositiveButton("删除") { _, _ -> runOperation { withContext(Dispatchers.IO) { check(repo.deleteRecursively()) } } }
                                 .setNegativeButton(android.R.string.cancel, null).show()
