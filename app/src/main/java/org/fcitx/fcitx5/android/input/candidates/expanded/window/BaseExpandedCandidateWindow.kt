@@ -24,7 +24,6 @@ import org.fcitx.fcitx5.android.core.CandidateAction
 import org.fcitx.fcitx5.android.core.CandidateWord
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.daemon.launchOnReady
-import org.fcitx.fcitx5.android.data.candidates.HanziIndex
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.BooleanKey.ExpandedCandidatesEmpty
 import org.fcitx.fcitx5.android.input.bar.ExpandButtonStateMachine.TransitionEvent.ExpandedCandidatesAttached
@@ -138,15 +137,14 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
         when (mode) {
             CandidateFilterMode.Single -> candidates
                 .filter { it.candidate.text.codePointCount(0, it.candidate.text.length) == 1 }
-                .mapNotNull { HanziIndex.of(it.candidate.text)?.radical }
-                .distinct().sortedWith(compareBy({ HanziIndex.radicalStrokes(it) }, { it }))
+                .mapNotNull { it.candidate.radical }
+                .distinct()
             CandidateFilterMode.None -> emptyList()
         }
 
     private fun keyOf(candidate: CandidateWord): String? {
-        val entry = HanziIndex.of(candidate.text) ?: return null
         return when (filterMode) {
-            CandidateFilterMode.Single -> entry.radical
+            CandidateFilterMode.Single -> candidate.radical
             CandidateFilterMode.None -> null
         }
     }

@@ -11,19 +11,26 @@ data class CandidateWord @JvmOverloads constructor(
     val comment: String,
     val spaceBetweenComment: Boolean = true
 ) {
+    val radical: String?
+        get() = RadicalMetadata.find(comment)?.groupValues?.get(1)
+
+    fun visibleComment(): String = RadicalMetadata.replace(comment, "").trimEnd()
+
     fun textWithComment(): String {
         return buildString {
             append(text)
-            if (comment.isNotBlank()) {
+            val visibleComment = visibleComment()
+            if (visibleComment.isNotBlank()) {
                 if (spaceBetweenComment) {
                     append(" ")
                 }
-                append(comment)
+                append(visibleComment)
             }
         }
     }
 
     companion object {
+        private val RadicalMetadata = Regex("\u2063fcitx-radical:([^\u2063]+)\u2063")
         val Empty = CandidateWord("", "", "", false)
     }
 }

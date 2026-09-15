@@ -31,4 +31,34 @@ class RimeRepositoryYamlTest {
             repositorySchemaList(defaults)
         )
     }
+
+    @Test
+    fun removesSchemasAlreadyEnabledByRepositoryDefault() {
+        val current = listOf(
+            linkedMapOf("schema" to "rime_mint"),
+            linkedMapOf("schema" to "custom_schema"),
+            linkedMapOf("schema" to "rime_mint")
+        )
+
+        assertEquals(
+            listOf(linkedMapOf("schema" to "custom_schema")),
+            normalizedSchemaAppend(
+                current,
+                baseSchemas = listOf("rime_mint"),
+                requestedSchemas = listOf("rime_mint")
+            )
+        )
+    }
+
+    @Test
+    fun appendsMissingSchemasOnlyOnce() {
+        assertEquals(
+            listOf(linkedMapOf("schema" to "new_schema")),
+            normalizedSchemaAppend(
+                current = emptyList<Any?>(),
+                baseSchemas = emptyList(),
+                requestedSchemas = listOf("new_schema", "new_schema")
+            )
+        )
+    }
 }

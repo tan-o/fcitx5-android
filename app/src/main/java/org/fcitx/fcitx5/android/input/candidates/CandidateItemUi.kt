@@ -51,12 +51,13 @@ class CandidateItemUi(override val ctx: Context, val theme: Theme) : Ui {
             color(fg) {
                 append(candidate.text)
             }
-            if (candidate.comment.isNotBlank()) {
+            val comment = candidate.visibleComment()
+            if (comment.isNotBlank()) {
                 if (candidate.spaceBetweenComment) {
                     append(" ")
                 }
                 color(altFg) {
-                    append(candidate.comment)
+                    append(comment)
                 }
             }
         }

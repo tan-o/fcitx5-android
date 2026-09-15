@@ -42,7 +42,27 @@ internal fun repositorySchemaList(text: String): List<String> {
     }.orEmpty()
 }
 
+internal fun normalizedSchemaAppend(
+    current: Collection<*>,
+    baseSchemas: Collection<String>,
+    requestedSchemas: Collection<String>
+): List<Any?> {
+    val seen = baseSchemas.toMutableSet()
+    val result = mutableListOf<Any?>()
+    current.forEach { entry ->
+        val schema = (entry as? Map<*, *>)?.get("schema")?.toString()
+        if (schema == null || seen.add(schema)) result += entry
+    }
+    requestedSchemas.forEach { schema ->
+        if (seen.add(schema)) result += linkedMapOf("schema" to schema)
+    }
+    return result
+}
+
 object RimeManager {
+    private const val RadicalFilterAsset = "rime/lua/fcitx_radical_filter.lua"
+    private const val RadicalFilterComponent = "lua_filter@*fcitx_radical_filter"
+
     data class GitProgress(val task: String, val completed: Int, val total: Int)
 
     private val lock = Mutex()
@@ -167,7 +187,8 @@ object RimeManager {
                 if (destination.exists()) check(destination.delete()) { "无法替换 ${source.name}" }
                 check(temporary.renameTo(destination)) { "无法安装 ${source.name}" }
             }
-            enableSchemas(schemaIds)
+            installRadicalMetadataFilter(availableSchemas)
+            enableSchemas(schemaIds, configuredSchemas)
             redeploy()
         }
     }
@@ -188,7 +209,7 @@ object RimeManager {
         }
     }
 
-    private fun enableSchemas(schemaIds: List<String>) {
+    private fun enableSchemas(schemaIds: List<String>, configuredSchemas: List<String>) {
         val file = customFile("default.custom.yaml")
         val data = if (file.exists()) {
             yaml().load<Map<String, Any?>>(file.readText()).toMutableMap()
@@ -202,16 +223,59 @@ object RimeManager {
             is Collection<*> -> current.toMutableList()
             else -> error("default.custom.yaml 的 $key 必须是列表")
         }
-        val existing = entries.mapNotNull { (it as? Map<*, *>)?.get("schema")?.toString() }.toSet()
-        val missing = schemaIds.filterNot(existing::contains)
-        if (missing.isEmpty()) return
-        missing.forEach { entries += linkedMapOf("schema" to it) }
-        patch[key] = entries
+        val replacementSchemas = (patch["schema_list"] as? Collection<*>)
+            ?.mapNotNull { (it as? Map<*, *>)?.get("schema")?.toString() }
+            .orEmpty()
+        val normalized = normalizedSchemaAppend(
+            entries,
+            configuredSchemas + replacementSchemas,
+            schemaIds
+        )
+        if (normalized == entries) return
+        if (normalized.isEmpty()) patch.remove(key) else patch[key] = normalized
         data["patch"] = patch
+        writeYaml(file, data, "无法保存 ${file.name}")
+    }
+
+    private fun installRadicalMetadataFilter(schemaIds: List<String>) {
+        val script = File(userDir, "lua/fcitx_radical_filter.lua")
+        script.parentFile!!.mkdirs()
+        val scriptText = appContext.assets.open(RadicalFilterAsset).bufferedReader().use { it.readText() }
+        if (!script.exists() || script.readText() != scriptText) {
+            val temporary = File(script.parentFile, script.name + ".installing")
+            temporary.writeText(scriptText)
+            if (script.exists()) check(script.delete()) { "无法替换 ${script.name}" }
+            check(temporary.renameTo(script)) { "无法安装 ${script.name}" }
+        }
+        schemaIds.forEach(::enableRadicalMetadataFilter)
+    }
+
+    private fun enableRadicalMetadataFilter(schemaId: String) {
+        val file = customFile("$schemaId.custom.yaml")
+        val data = if (file.exists()) {
+            yaml().load<Map<String, Any?>>(file.readText()).toMutableMap()
+        } else linkedMapOf<String, Any?>("patch" to linkedMapOf<String, Any?>())
+        @Suppress("UNCHECKED_CAST")
+        val patch = (data["patch"] as? Map<String, Any?>)?.toMutableMap()
+            ?: error("${file.name} 的 patch 必须是映射")
+        val key = "engine/filters/+"
+        val filters = when (val current = patch[key]) {
+            null -> mutableListOf<Any?>()
+            is Collection<*> -> current.toMutableList()
+            else -> error("${file.name} 的 $key 必须是列表")
+        }
+        if (RadicalFilterComponent in filters) return
+        filters += RadicalFilterComponent
+        patch[key] = filters
+        data["patch"] = patch
+        writeYaml(file, data, "无法保存 ${file.name}")
+    }
+
+    private fun writeYaml(file: File, data: Map<String, Any?>, failure: String) {
         val temporary = File(file.parentFile, file.name + ".saving")
         temporary.writeText(Yaml().dump(data))
         if (file.exists()) check(file.delete()) { "无法替换 ${file.name}" }
-        check(temporary.renameTo(file)) { "无法保存 ${file.name}" }
+        check(temporary.renameTo(file)) { failure }
     }
     fun schemas(): List<String> = (userDir.listFiles().orEmpty().toList() + sharedDir.listFiles().orEmpty().toList())
         .filter { it.name.endsWith(".schema.yaml") }.map { it.name.removeSuffix(".schema.yaml") }.distinct().sorted()
