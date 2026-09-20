@@ -1,0 +1,7 @@
+schema:
+  schema_id: fcitx_components
+  name: Candidate components (internal)
+  version: '1'
+translator:
+  dictionary: fcitx_components
+  enable_user_dict: false

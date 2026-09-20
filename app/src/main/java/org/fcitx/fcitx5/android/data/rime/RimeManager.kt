@@ -237,6 +237,16 @@ object RimeManager {
     }
 
     private fun installRadicalMetadataFilter(schemaIds: List<String>) {
+        listOf("fcitx_components.dict.yaml", "fcitx_components.schema.yaml").forEach { name ->
+            val text = appContext.assets.open("rime/$name").bufferedReader().use { it.readText() }
+            val target = File(userDir, name)
+            if (!target.exists() || target.readText() != text) {
+                val temporary = File(userDir, "$name.installing")
+                temporary.writeText(text)
+                if (target.exists()) check(target.delete()) { "无法替换 $name" }
+                check(temporary.renameTo(target)) { "无法安装 $name" }
+            }
+        }
         val script = File(userDir, "lua/fcitx_radical_filter.lua")
         script.parentFile!!.mkdirs()
         val scriptText = appContext.assets.open(RadicalFilterAsset).bufferedReader().use { it.readText() }
@@ -246,7 +256,7 @@ object RimeManager {
             if (script.exists()) check(script.delete()) { "无法替换 ${script.name}" }
             check(temporary.renameTo(script)) { "无法安装 ${script.name}" }
         }
-        schemaIds.forEach(::enableRadicalMetadataFilter)
+        schemaIds.filter { it != "fcitx_components" }.forEach(::enableRadicalMetadataFilter)
     }
 
     private fun enableRadicalMetadataFilter(schemaId: String) {
@@ -263,9 +273,16 @@ object RimeManager {
             is Collection<*> -> current.toMutableList()
             else -> error("${file.name} 的 $key 必须是列表")
         }
-        if (RadicalFilterComponent in filters) return
-        filters += RadicalFilterComponent
+        if (RadicalFilterComponent !in filters) filters += RadicalFilterComponent
         patch[key] = filters
+        val dependenciesKey = "schema/dependencies/+"
+        val dependencies = when (val current = patch[dependenciesKey]) {
+            null -> mutableListOf<Any?>()
+            is Collection<*> -> current.toMutableList()
+            else -> error("${file.name} 的 $dependenciesKey 必须是列表")
+        }
+        if ("fcitx_components" !in dependencies) dependencies += "fcitx_components"
+        patch[dependenciesKey] = dependencies
         data["patch"] = patch
         writeYaml(file, data, "无法保存 ${file.name}")
     }
@@ -277,7 +294,8 @@ object RimeManager {
         check(temporary.renameTo(file)) { failure }
     }
     fun schemas(): List<String> = (userDir.listFiles().orEmpty().toList() + sharedDir.listFiles().orEmpty().toList())
-        .filter { it.name.endsWith(".schema.yaml") }.map { it.name.removeSuffix(".schema.yaml") }.distinct().sorted()
+        .filter { it.name.endsWith(".schema.yaml") && it.name != "fcitx_components.schema.yaml" }
+        .map { it.name.removeSuffix(".schema.yaml") }.distinct().sorted()
 
     suspend fun setModel(schema: String, enabled: Boolean) = withContext(Dispatchers.IO) {
         check(!enabled || WanxiangModel.installed) { "请先下载万象模型" }

@@ -11,8 +11,11 @@ data class CandidateWord @JvmOverloads constructor(
     val comment: String,
     val spaceBetweenComment: Boolean = true
 ) {
-    val radical: String?
-        get() = RadicalMetadata.find(comment)?.groupValues?.get(1)
+    val radicals: List<String>
+        get() {
+            val glyphs = RadicalMetadata.find(comment)?.groupValues?.get(1) ?: return emptyList()
+            return glyphs.codePoints().toArray().map { String(Character.toChars(it)) }.distinct()
+        }
 
     fun visibleComment(): String = RadicalMetadata.replace(comment, "").trimEnd()
 

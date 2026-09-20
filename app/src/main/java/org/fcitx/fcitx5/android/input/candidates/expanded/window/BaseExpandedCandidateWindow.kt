@@ -137,17 +137,11 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
         when (mode) {
             CandidateFilterMode.Single -> candidates
                 .filter { it.candidate.text.codePointCount(0, it.candidate.text.length) == 1 }
-                .mapNotNull { it.candidate.radical }
+                .flatMap { it.candidate.radicals }
                 .distinct()
             CandidateFilterMode.None -> emptyList()
         }
 
-    private fun keyOf(candidate: CandidateWord): String? {
-        return when (filterMode) {
-            CandidateFilterMode.Single -> candidate.radical
-            CandidateFilterMode.None -> null
-        }
-    }
 
     private fun applyFilter(chip: String?) {
         if (chip == null) {
@@ -162,7 +156,7 @@ abstract class BaseExpandedCandidateWindow<T : BaseExpandedCandidateWindow<T>> :
         val matched = allCandidates.filter {
             it.generation == adapter.generation &&
                 it.candidate.text.codePointCount(0, it.candidate.text.length) == 1 &&
-                (chip == null || keyOf(it.candidate) == chip)
+                (chip == null || chip in it.candidate.radicals)
         }
         candidatesSubmitJob?.cancel()
         candidateLayout.resetPosition()

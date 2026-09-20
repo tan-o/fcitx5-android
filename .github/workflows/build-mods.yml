@@ -40,7 +40,12 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y extra-cmake-modules gettext
+          sudo apt-get install -y extra-cmake-modules gettext librime-dev librime-plugin-lua
+      - name: Test real Rime component lookup and Lua filter
+        run: |
+          g++ -std=c++17 scripts/test-rime-components.cpp -lrime -o /tmp/test-rime-components
+          component_test_dir=$(mktemp -d)
+          /tmp/test-rime-components app/src/main/assets/rime "$component_test_dir"
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
       - name: Test and build app with embedded Rime
