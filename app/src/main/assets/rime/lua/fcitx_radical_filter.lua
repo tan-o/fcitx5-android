@@ -42,7 +42,9 @@ local function init(env)
   local config = env.engine.schema.config
   local dictionary = config:get_string("radical_reverse_lookup/dictionary")
   if not dictionary or dictionary == "" then
-    return
+    -- Most maintained radical/decomposition schemes expose this Rime
+    -- dictionary even when the active schema does not repeat the setting.
+    dictionary = "radical_pinyin"
   end
 
   local reverse_ok, reverse = pcall(ReverseLookup, dictionary)

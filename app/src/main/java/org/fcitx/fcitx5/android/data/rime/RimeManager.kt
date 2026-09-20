@@ -187,7 +187,6 @@ object RimeManager {
                 if (destination.exists()) check(destination.delete()) { "无法替换 ${source.name}" }
                 check(temporary.renameTo(destination)) { "无法安装 ${source.name}" }
             }
-            installRadicalMetadataFilter(availableSchemas)
             enableSchemas(schemaIds, configuredSchemas)
             redeploy()
         }
@@ -295,6 +294,9 @@ object RimeManager {
         saveCustom(file.name, Yaml().dump(data))
     }
     suspend fun redeploy() = withContext(Dispatchers.IO) {
+        // Keep the bundled candidate metadata filter in sync for both freshly
+        // cloned repositories and existing installations upgraded in place.
+        installRadicalMetadataFilter(schemas())
         val name = "rime-deploy-${java.util.UUID.randomUUID()}"
         val connection = FcitxDaemon.connect(name)
         try { connection.runOnReady { setAddonSubConfig("rime", "deploy") } }
