@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
     auto api = rime_get_api();
     RIME_STRUCT(RimeTraits, traits);
     auto path = dir.string();
-    const char *modules[] = {"default", "lua", nullptr};
+    const char *modules[] = {"default", "plugins", "lua", nullptr};
     traits.shared_data_dir = path.c_str();
     traits.user_data_dir = path.c_str();
     traits.app_name = "rime.component-test";
