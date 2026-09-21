@@ -147,7 +147,11 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         val ctx = requireContext()
         preferenceScreen = preferenceManager.createPreferenceScreen(ctx).apply {
-            status = Preference(ctx).apply { title = "Rime"; summary = "已内置；自定义设置保存在独立的 .custom.yaml 文件中" }
+            status = Preference(ctx).apply {
+                title = "Rime"
+                summary = RimeManager.componentsError?.let { "部首筛选配置失败：$it" }
+                    ?: "已内置；部首筛选使用 Rime 原生 OpenCC 和白霜 Moqi 拆字数据"
+            }
             addPreference(status)
             addPreference("Clone 方案仓库") {
                 val input = EditText(ctx).apply { hint = "https://github.com/用户/仓库.git"; inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI }
@@ -338,3 +342,4 @@ class RimeSettingsFragment : PaddingPreferenceFragment() {
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }
+

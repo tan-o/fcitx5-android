@@ -429,6 +429,12 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     private val dispatcher = FcitxDispatcher(object : FcitxDispatcher.FcitxController {
         override fun nativeStartup() {
             DataManager.sync()
+            try {
+                org.fcitx.fcitx5.android.data.rime.RimeManager.prepareComponents()
+            } catch (error: Exception) {
+                // A malformed user patch must be reported without taking down the IME.
+                Timber.e(error, "Rime component configuration failed; see Rime settings")
+            }
             val locale = Locales.fcitxLocale
             val dataDir = DataManager.dataDir.absolutePath
             val plugins = DataManager.getLoadedPlugins()
@@ -574,3 +580,4 @@ class Fcitx(private val context: Context) : FcitxAPI, FcitxLifecycleOwner {
     }
 
 }
+

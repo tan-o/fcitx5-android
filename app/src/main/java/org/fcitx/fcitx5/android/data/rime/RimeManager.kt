@@ -60,8 +60,6 @@ internal fun normalizedSchemaAppend(
 }
 
 object RimeManager {
-    private const val RadicalFilterAsset = "rime/lua/fcitx_radical_filter.lua"
-    private const val RadicalFilterComponent = "lua_filter@*fcitx_radical_filter"
 
     data class GitProgress(val task: String, val completed: Int, val total: Int)
 
@@ -236,55 +234,20 @@ object RimeManager {
         writeYaml(file, data, "无法保存 ${file.name}")
     }
 
-    private fun installRadicalMetadataFilter(schemaIds: List<String>) {
-        listOf("fcitx_components.dict.yaml", "fcitx_components.schema.yaml").forEach { name ->
-            val text = appContext.assets.open("rime/$name").bufferedReader().use { it.readText() }
-            val target = File(userDir, name)
-            if (!target.exists() || target.readText() != text) {
-                val temporary = File(userDir, "$name.installing")
-                temporary.writeText(text)
-                if (target.exists()) check(target.delete()) { "无法替换 $name" }
-                check(temporary.renameTo(target)) { "无法安装 $name" }
-            }
-        }
-        val script = File(userDir, "lua/fcitx_radical_filter.lua")
-        script.parentFile!!.mkdirs()
-        val scriptText = appContext.assets.open(RadicalFilterAsset).bufferedReader().use { it.readText() }
-        if (!script.exists() || script.readText() != scriptText) {
-            val temporary = File(script.parentFile, script.name + ".installing")
-            temporary.writeText(scriptText)
-            if (script.exists()) check(script.delete()) { "无法替换 ${script.name}" }
-            check(temporary.renameTo(script)) { "无法安装 ${script.name}" }
-        }
-        schemaIds.filter { it != "fcitx_components" }.forEach(::enableRadicalMetadataFilter)
-    }
+    @Volatile var componentsError: String? = null
+        private set
 
-    private fun enableRadicalMetadataFilter(schemaId: String) {
-        val file = customFile("$schemaId.custom.yaml")
-        val data = if (file.exists()) {
-            yaml().load<Map<String, Any?>>(file.readText()).toMutableMap()
-        } else linkedMapOf<String, Any?>("patch" to linkedMapOf<String, Any?>())
-        @Suppress("UNCHECKED_CAST")
-        val patch = (data["patch"] as? Map<String, Any?>)?.toMutableMap()
-            ?: error("${file.name} 的 patch 必须是映射")
-        val key = "engine/filters/+"
-        val filters = when (val current = patch[key]) {
-            null -> mutableListOf<Any?>()
-            is Collection<*> -> current.toMutableList()
-            else -> error("${file.name} 的 $key 必须是列表")
+    /** Called before librime starts, and before deploying an imported repository. */
+    fun prepareComponents() {
+        try {
+            RimeComponents.install(userDir, schemas()) { name ->
+                appContext.assets.open("rime/$name").bufferedReader().use { it.readText() }
+            }
+            componentsError = null
+        } catch (error: Exception) {
+            componentsError = error.message ?: error.javaClass.simpleName
+            throw error
         }
-        if (RadicalFilterComponent !in filters) filters += RadicalFilterComponent
-        patch[key] = filters
-        val dependenciesKey = "schema/dependencies/+"
-        val dependencies = when (val current = patch[dependenciesKey]) {
-            null -> mutableListOf<Any?>()
-            is Collection<*> -> current.toMutableList()
-            else -> error("${file.name} 的 $dependenciesKey 必须是列表")
-        }
-        if ("fcitx_components" !in dependencies) dependencies += "fcitx_components"
-        patch[dependenciesKey] = dependencies
-        data["patch"] = patch
-        writeYaml(file, data, "无法保存 ${file.name}")
     }
 
     private fun writeYaml(file: File, data: Map<String, Any?>, failure: String) {
@@ -314,7 +277,7 @@ object RimeManager {
     suspend fun redeploy() = withContext(Dispatchers.IO) {
         // Keep the bundled candidate metadata filter in sync for both freshly
         // cloned repositories and existing installations upgraded in place.
-        installRadicalMetadataFilter(schemas())
+        prepareComponents()
         val name = "rime-deploy-${java.util.UUID.randomUUID()}"
         val connection = FcitxDaemon.connect(name)
         try { connection.runOnReady { setAddonSubConfig("rime", "deploy") } }

@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 60
     env:
       BUILD_ABI: arm64-v8a
+      RIME_COMPONENT_FIXTURE: ${{ github.workspace }}/.component-mint
+      RIME_COMPONENT_ASSETS: ${{ github.workspace }}/app/src/main/assets/rime
     steps:
       - name: Fetch source code
         uses: actions/checkout@v7
@@ -41,15 +43,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y extra-cmake-modules gettext librime-dev librime-plugin-lua
-      - name: Test real Rime component lookup and Lua filter
-        run: |
-          g++ -std=c++17 scripts/test-rime-components.cpp -lrime -o /tmp/test-rime-components
-          component_test_dir=$(mktemp -d)
-          /tmp/test-rime-components app/src/main/assets/rime "$component_test_dir"
+      - name: Fetch real Mint scheme for integration testing
+        uses: actions/checkout@v7
+        with:
+          repository: Mintimate/oh-my-rime
+          ref: 660471510ac3625734a8991947e2a800de68cbe0
+          path: .component-mint
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
       - name: Test and build app with embedded Rime
-        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --stacktrace --no-build-cache
+      - name: Test real Mint candidates with production component configuration
+        run: |
+          g++ -std=c++17 scripts/test-rime-components.cpp -lrime -o /tmp/test-rime-components
+          /tmp/test-rime-components "$RIME_COMPONENT_FIXTURE"
       - name: Collect APKs
         # Validate embedded assets before publishing an installable artifact.
         run: |
