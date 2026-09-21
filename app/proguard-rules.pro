@@ -35,3 +35,35 @@
 # https://onnxruntime.ai/docs/build/android.html#note-proguard-rules-for-r8-minimization-android-app-builds-to-work
 -keep class ai.onnxruntime.** { *; }
 
+# JGit populates translation bundle constructors/fields through reflection.
+-keepclassmembers class * extends org.eclipse.jgit.nls.TranslationBundle {
+    public <init>();
+    public java.lang.String *;
+}
+
+# Optional desktop APIs only. SnakeYAML detects Android and uses field access;
+# JGit guards ProcessHandle with SystemReader.isAndroid(). JMX stays disabled
+# by default; public HTTPS repositories do not use Kerberos authentication.
+# Do not suppress missing classes outside these verified desktop integrations.
+-dontwarn java.beans.BeanInfo
+-dontwarn java.beans.FeatureDescriptor
+-dontwarn java.beans.IntrospectionException
+-dontwarn java.beans.Introspector
+-dontwarn java.beans.PropertyDescriptor
+-dontwarn java.lang.ProcessHandle
+-dontwarn java.lang.management.ManagementFactory
+-dontwarn javax.management.InstanceAlreadyExistsException
+-dontwarn javax.management.InstanceNotFoundException
+-dontwarn javax.management.JMException
+-dontwarn javax.management.MBeanRegistrationException
+-dontwarn javax.management.MBeanServer
+-dontwarn javax.management.MalformedObjectNameException
+-dontwarn javax.management.NotCompliantMBeanException
+-dontwarn javax.management.ObjectInstance
+-dontwarn javax.management.ObjectName
+-dontwarn org.ietf.jgss.GSSContext
+-dontwarn org.ietf.jgss.GSSCredential
+-dontwarn org.ietf.jgss.GSSException
+-dontwarn org.ietf.jgss.GSSManager
+-dontwarn org.ietf.jgss.GSSName
+-dontwarn org.ietf.jgss.Oid
