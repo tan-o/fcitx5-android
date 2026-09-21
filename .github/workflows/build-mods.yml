@@ -56,7 +56,8 @@ jobs:
           SIGN_KEY_BASE64: ${{ secrets.SIGN_KEY_BASE64 }}
           SIGN_KEY_PWD: ${{ secrets.SIGN_KEY_PWD }}
           SIGN_KEY_ALIAS: ${{ secrets.SIGN_KEY_ALIAS }}
-        run: ./gradlew :app:testReleaseUnitTest :app:assembleRelease --stacktrace --no-build-cache
+        # The project's host unit-test variant is debug; the shipped APK is release.
+        run: ./gradlew :app:testDebugUnitTest :app:assembleRelease --stacktrace --no-build-cache
       - name: Test real Mint candidates with production component configuration
         run: |
           g++ -std=c++17 scripts/test-rime-components.cpp -lrime -o /tmp/test-rime-components
