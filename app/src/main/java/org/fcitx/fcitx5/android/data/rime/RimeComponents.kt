@@ -11,6 +11,7 @@ internal object RimeComponents {
     private const val Option = "_fcitx_components"
     private const val ObsoleteFilter = "lua_filter@*fcitx_radical_filter"
 
+    @Synchronized
     fun install(userDir: File, schemas: List<String>, asset: (String) -> String) {
         listOf("moqi_chaifen_all.json", "moqi_chaifen_all.txt").forEach { name ->
             val path = "opencc/fcitx-components/$name"
