@@ -33,6 +33,11 @@ class ModelDownloadWorker(context: Context, params: WorkerParameters) : Coroutin
                     .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()).build())
         }
         val handwritingFile get() = File(appContext.noBackupFilesDir, "models/ppocrv6-small.onnx")
+
+        suspend fun isRunning(kind: String): Boolean = withContext(Dispatchers.IO) {
+            WorkManager.getInstance(appContext).getWorkInfosForUniqueWork("model-$kind").get()
+                .any { !it.state.isFinished }
+        }
     }
     private val kind get() = inputData.getString("kind")!!
     private val title get() = if (kind == HAND) "手写模型" else "万象模型"

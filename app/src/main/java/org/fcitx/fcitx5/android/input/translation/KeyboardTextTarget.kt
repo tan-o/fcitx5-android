@@ -5,8 +5,14 @@ import android.widget.EditText
 import org.fcitx.fcitx5.android.core.FcitxEvent
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 
-/** An editor inside the keyboard, separate from the application's input connection. */
-class KeyboardTextTarget(private val editor: EditText) {
+/**
+ * An editor inside the keyboard, separate from the application's input connection.
+ * [onReturn] replaces inserting a line break when the Return key reaches the editor.
+ */
+class KeyboardTextTarget(
+    private val editor: EditText,
+    private val onReturn: (() -> Unit)? = null
+) {
     private var composingStart = -1
     private var composingEnd = -1
 
@@ -80,7 +86,7 @@ class KeyboardTextTarget(private val editor: EditText) {
                     FcitxKeyMapping.FcitxKey_BackSpace -> deleteSurrounding(1, 0)
                     FcitxKeyMapping.FcitxKey_Left -> moveCursor(-1)
                     FcitxKeyMapping.FcitxKey_Right -> moveCursor(1)
-                    FcitxKeyMapping.FcitxKey_Return -> commit("\n")
+                    FcitxKeyMapping.FcitxKey_Return -> if (onReturn != null) onReturn.invoke() else commit("\n")
                     else -> if (key.unicode > 0) commit(String(Character.toChars(key.unicode)))
                 }
             }

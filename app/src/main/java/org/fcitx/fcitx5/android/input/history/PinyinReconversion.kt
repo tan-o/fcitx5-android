@@ -7,6 +7,10 @@ import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 
 /** Keeps only the most recent committed phrase and its actual displayed spelling. */
 class PinyinReconversion(private val service: FcitxInputMethodService) {
+    private companion object {
+        val Spelling = Regex("[a-zA-ZüÜvV'’ ]+")
+    }
+
     private var enabled = false
     private var pending = ""
     private var committed = ""
@@ -15,7 +19,7 @@ class PinyinReconversion(private val service: FcitxInputMethodService) {
     fun clear() = reset(enabled)
     fun preedit(text: String) {
         if (!enabled || text.isEmpty()) return
-        pending = if (text.matches(Regex("[a-zA-ZüÜvV'’ ]+"))) text.replace(" ", "").replace('’', '\'') else ""
+        pending = if (text.matches(Spelling)) text.replace(" ", "").replace('’', '\'') else ""
     }
     fun committed(text: String) {
         if (!enabled) return

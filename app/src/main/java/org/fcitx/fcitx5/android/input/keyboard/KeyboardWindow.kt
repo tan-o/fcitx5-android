@@ -9,6 +9,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
 import androidx.transition.Slide
 import org.fcitx.fcitx5.android.R
@@ -18,12 +19,16 @@ import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.input.bar.KawaiiBarComponent
 import org.fcitx.fcitx5.android.input.broadcast.InputBroadcastReceiver
 import org.fcitx.fcitx5.android.input.broadcast.ReturnKeyDrawableComponent
+import org.fcitx.fcitx5.android.input.clipboard.ClipboardSearchBar
+import org.fcitx.fcitx5.android.input.clipboard.ClipboardWindow
 import org.fcitx.fcitx5.android.input.dependency.fcitx
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
 import org.fcitx.fcitx5.android.input.picker.PickerWindow
 import org.fcitx.fcitx5.android.input.popup.PopupActionListener
 import org.fcitx.fcitx5.android.input.popup.PopupComponent
+import org.fcitx.fcitx5.android.input.translation.KeyboardTextTarget
+import org.fcitx.fcitx5.android.input.translation.TranslationBar
 import org.fcitx.fcitx5.android.input.wm.EssentialWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
@@ -32,6 +37,7 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import splitties.views.dsl.core.wrapContent
 
 class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), EssentialWindow,
     InputBroadcastReceiver {
@@ -63,11 +69,41 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
             nextWindow !is PickerWindow
         }
 
-    private val translation by lazy { org.fcitx.fcitx5.android.input.translation.TranslationBar(service, theme) }
+    private val translation by lazy { TranslationBar(service, theme, ::updateTopPanel) }
 
-    fun toggleTranslation() = translation.toggle()
+    private val clipboardSearch by lazy {
+        ClipboardSearchBar(service, theme, ::updateTopPanel) {
+            windowManager.attachWindow(ClipboardWindow())
+        }
+    }
 
-    val topPanel: View get() = translation.root
+    /** Panels shown above the keyboard; they edit a [KeyboardTextTarget] instead of the app. */
+    val topPanel: LinearLayout by lazy {
+        LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            addView(translation.root, LinearLayout.LayoutParams(matchParent, wrapContent))
+            addView(clipboardSearch.root, LinearLayout.LayoutParams(matchParent, wrapContent))
+        }
+    }
+
+    private fun updateTopPanel() {
+        topPanel.visibility =
+            if (translation.isOpen || clipboardSearch.isOpen) View.VISIBLE else View.GONE
+        service.requestInputLayout()
+    }
+
+    fun toggleTranslation() {
+        clipboardSearch.close()
+        translation.toggle()
+    }
+
+    fun openClipboardSearch() {
+        translation.close()
+        clipboardSearch.open()
+    }
+
+    fun closeClipboardSearch() = clipboardSearch.close()
 
     private lateinit var keyboardView: FrameLayout
 
@@ -146,6 +182,7 @@ class KeyboardWindow : InputWindow.SimpleInputWindow<KeyboardWindow>(), Essentia
 
     override fun onStartInput(info: EditorInfo, capFlags: CapabilityFlags) {
         translation.close()
+        clipboardSearch.close()
         val targetLayout = when (info.inputType and InputType.TYPE_MASK_CLASS) {
             InputType.TYPE_CLASS_NUMBER -> NumberKeyboard.Name
             InputType.TYPE_CLASS_PHONE -> NumberKeyboard.Name

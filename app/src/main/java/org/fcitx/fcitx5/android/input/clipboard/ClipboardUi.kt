@@ -14,17 +14,9 @@ import android.widget.TextView
 import android.graphics.drawable.GradientDrawable
 import android.widget.ViewAnimator
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.data.theme.ThemeManager
 import org.fcitx.fcitx5.android.input.bar.ui.ToolButton
-import org.fcitx.fcitx5.android.input.keyboard.TextKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.NumberKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.BaseKeyboard
-import org.fcitx.fcitx5.android.input.keyboard.SymbolKey
-import org.fcitx.fcitx5.android.input.keyboard.LayoutSwitchKey
-import org.fcitx.fcitx5.android.input.keyboard.BackspaceKey
-import org.fcitx.fcitx5.android.input.keyboard.ReturnKey
 import splitties.dimensions.dp
 import splitties.views.backgroundColor
 import splitties.views.dsl.coordinatorlayout.coordinatorLayout
@@ -34,7 +26,6 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.core.horizontalLayout
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
-import splitties.views.dsl.core.textView
 import splitties.views.dsl.core.verticalLayout
 import splitties.views.dsl.core.view
 import splitties.views.dsl.recyclerview.recyclerView
@@ -50,15 +41,10 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
 
     val emptyUi = ClipboardInstructionUi.Empty(ctx, theme)
 
-    val viewAnimator =  view(::ViewAnimator) {
+    val viewAnimator = view(::ViewAnimator) {
         add(recyclerView, lParams(matchParent, matchParent))
         add(emptyUi.root, lParams(matchParent, matchParent))
         add(enableUi.root, lParams(matchParent, matchParent))
-        add(textView {
-            setText(R.string.clipboard_no_results)
-            gravity = Gravity.CENTER
-            setTextColor(theme.keyTextColor)
-        }, lParams(matchParent, matchParent))
     }
 
     val tabsUi = ClipboardTabsUi(ctx, theme)
@@ -73,49 +59,12 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
         visibility = View.GONE
     }
 
-    val searchBar = textView {
-        textSize = 14f
-        isSingleLine = true
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(12), 0, dp(12), 0)
-        setTextColor(theme.keyTextColor)
-        visibility = View.GONE
-    }
-
-    val searchKeyboard = TextKeyboard(ctx, theme)
-    val searchNumberKeyboard = NumberKeyboard(ctx, theme)
-    val searchSymbolKeyboard = object : BaseKeyboard(ctx, theme, listOf(
-        "!@#$%^&*()".map { SymbolKey(it.toString()) },
-        "[]{}<>_=+~".map { SymbolKey(it.toString()) },
-        listOf(LayoutSwitchKey("ABC", TextKeyboard.Name, 0.2f)) +
-            ":;?/.,".map { SymbolKey(it.toString()) } +
-            listOf(BackspaceKey(), ReturnKey())
-    )) {}
-    val searchKeyboards = listOf(searchKeyboard, searchNumberKeyboard, searchSymbolKeyboard)
-    private val keyboardContainer = FrameLayout(ctx).apply {
-        searchKeyboards.forEach { addView(it, FrameLayout.LayoutParams(matchParent, matchParent)) }
-        visibility = View.GONE
-    }
-
-    fun switchSearchKeyboard(name: String) {
-        val selected = when (name) {
-            TextKeyboard.Name -> searchKeyboard
-            "Symbol" -> searchSymbolKeyboard
-            else -> searchNumberKeyboard
-        }
-        searchKeyboards.forEach { it.visibility = if (it === selected) View.VISIBLE else View.GONE }
-    }
-
-    private var searching = false
-
     private val keyBorder by ThemeManager.prefs.keyBorder
 
     private val content = verticalLayout {
         addView(tabsUi.root, LinearLayout.LayoutParams(matchParent, dp(36)))
         addView(categoryScroll, LinearLayout.LayoutParams(matchParent, dp(34)))
-        addView(searchBar, LinearLayout.LayoutParams(matchParent, dp(36)))
         addView(viewAnimator, LinearLayout.LayoutParams(matchParent, 0, 1f))
-        addView(keyboardContainer, LinearLayout.LayoutParams(matchParent, 0, 1.6f))
     }
 
     override val root = coordinatorLayout {
@@ -138,15 +87,6 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
         add(deleteAllButton, lParams(dp(40), dp(40)))
     }
 
-    fun setSearchMode(on: Boolean) {
-        searching = on
-        tabsUi.root.visibility = if (on) View.GONE else View.VISIBLE
-        if (on) categoryScroll.visibility = View.GONE
-        searchBar.visibility = if (on) View.VISIBLE else View.GONE
-        keyboardContainer.visibility = if (on) View.VISIBLE else View.GONE
-        if (on) switchSearchKeyboard(TextKeyboard.Name)
-    }
-
     fun showCategories(labels: List<String>, selected: String?, onSelect: (String?) -> Unit) {
         categoryRow.removeAllViews()
         val values = listOf<String?>(null) + labels
@@ -166,15 +106,11 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
                 marginStart = ctx.dp(4)
             })
         }
-        categoryScroll.visibility = if (!searching && labels.isNotEmpty()) View.VISIBLE else View.GONE
+        categoryScroll.visibility = if (labels.isNotEmpty()) View.VISIBLE else View.GONE
     }
 
     fun hideCategories() {
         categoryScroll.visibility = View.GONE
-    }
-
-    fun updateSearchQuery(query: String) {
-        searchBar.text = query.ifEmpty { ctx.getString(R.string.clipboard_search_hint) }
     }
 
     private fun setDeleteButtonShown(enabled: Boolean) {
@@ -182,7 +118,6 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
     }
 
     private fun setTabsShown(shown: Boolean) {
-        if (searching) return
         tabsUi.root.visibility = if (shown) View.VISIBLE else View.GONE
     }
 
@@ -195,7 +130,7 @@ class ClipboardUi(override val ctx: Context, private val theme: Theme) : Ui {
                 setTabsShown(true)
             }
             ClipboardStateMachine.State.AddMore -> {
-                viewAnimator.displayedChild = if (searching) 3 else 1
+                viewAnimator.displayedChild = 1
                 setDeleteButtonShown(false)
                 setTabsShown(true)
             }

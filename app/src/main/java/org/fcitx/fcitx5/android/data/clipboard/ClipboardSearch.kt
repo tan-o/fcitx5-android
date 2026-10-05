@@ -7,11 +7,17 @@ package org.fcitx.fcitx5.android.data.clipboard
 import java.text.Normalizer
 import java.util.Locale
 
-/** Literal substring, then untoned pinyin/full initials. No SQL wildcards. */
+/**
+ * Literal substring, then untoned pinyin/full initials. No SQL wildcards.
+ * Syllable separators typed in pinyin queries (spaces, apostrophes) are ignored and
+ * `v` may stand for `ü`.
+ */
 object ClipboardSearch {
+    private val separators = setOf(' ', '\'', '\u2019')
+
     fun matches(text: String, query: String, reading: (String) -> String?): Boolean {
         if (text.contains(query, ignoreCase = true)) return true
-        val needle = query.lowercase(Locale.ROOT)
+        val needle = query.lowercase(Locale.ROOT).filterNot { it in separators }
         if (needle.isEmpty() || needle.any { it !in 'a'..'z' }) return false
         val full = StringBuilder()
         val initials = StringBuilder()
@@ -33,6 +39,8 @@ object ClipboardSearch {
             }
             offset += Character.charCount(cp)
         }
-        return needle in full || needle in initials
+        val alternative = needle.replace('v', 'u')
+        return needle in full || needle in initials ||
+            (alternative != needle && (alternative in full || alternative in initials))
     }
 }

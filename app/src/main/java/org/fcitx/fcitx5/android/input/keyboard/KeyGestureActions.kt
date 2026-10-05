@@ -62,6 +62,28 @@ object KeyGestureActions {
     }
 
     /**
+     * Long-press choices the user changed, or null when the key still uses the built-in popup.
+     * The built-in popup keeps sending keys through fcitx (punctuation conversion and
+     * upper-case variants included), which plain text commits cannot reproduce.
+     */
+    fun customLongPress(context: Context, key: String): List<Entry>? {
+        val normalized = key.lowercase()
+        val saved = PreferenceManager.getDefaultSharedPreferences(context)
+            .getString(longPressPreferenceKey(normalized), null) ?: return null
+        if (saved.trim() == defaultLongPressSpec(normalized).trim()) return null
+        return saved.lineSequence().mapNotNull(::parse).toList()
+    }
+
+    /** Text that would otherwise be read as a command is stored with an explicit `text:` prefix. */
+    fun encodeText(text: String): String =
+        if (isCommand(text.trim()) || hasCommandAfterSeparator(text.trim())) "text:$text" else text
+
+    private fun hasCommandAfterSeparator(text: String): Boolean {
+        val separator = text.indexOf('=')
+        return separator > 0 && isCommand(text.substring(separator + 1).trim())
+    }
+
+    /**
      * One action per line. A label may be placed before '=' when the right side is a command.
      * Otherwise '=' is committed as ordinary text.
      * Plain text commits itself. Supported commands:
@@ -71,6 +93,11 @@ object KeyGestureActions {
     fun parse(line: String): Entry? {
         val trimmed = line.trim()
         if (trimmed.isEmpty()) return null
+        // an unlabeled `text:` line is always literal, even when it contains `=command`
+        if (trimmed.startsWith("text:", ignoreCase = true)) {
+            val text = trimmed.substringAfter(':')
+            return if (text.isEmpty()) null else Entry(text, KeyAction.CommitAction(text))
+        }
         val separator = trimmed.indexOf('=')
         val explicitLabel = separator > 0 && isCommand(trimmed.substring(separator + 1).trim())
         val spec = if (explicitLabel) trimmed.substring(separator + 1).trim() else trimmed

@@ -19,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.fcitx.fcitx5.android.R
+import org.fcitx.fcitx5.android.data.download.ModelDownloadWorker
 import org.fcitx.fcitx5.android.data.handwriting.HandwritingPinyin
 import org.fcitx.fcitx5.android.data.handwriting.HandwritingRecognizer
 import org.fcitx.fcitx5.android.data.handwriting.HandwritingRecognizer.Point
@@ -86,7 +87,10 @@ class HandwritingWindow : InputWindow.ExtendedInputWindow<HandwritingWindow>() {
         modelJob = service.lifecycleScope.launch {
             try {
                 val engine = recognizer ?: HandwritingRecognizer().also { recognizer = it }
-                if (download) {
+                // keep showing progress when the panel is reopened during a background download
+                val observe = download ||
+                    (!engine.isReady() && ModelDownloadWorker.isRunning(ModelDownloadWorker.HAND))
+                if (observe) {
                     status.text = "后台下载手写模型中；可返回键盘，进度见通知栏"
                     downloadProgress.visibility = View.VISIBLE
                     engine.download { received, total, text ->

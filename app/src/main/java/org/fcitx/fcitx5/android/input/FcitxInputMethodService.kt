@@ -246,7 +246,8 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     val pinyinReconversion by lazy { org.fcitx.fcitx5.android.input.history.PinyinReconversion(this) }
 
     var keyboardTextTarget: org.fcitx.fcitx5.android.input.translation.KeyboardTextTarget? = null
-    var closeTranslation: (() -> Unit)? = null
+    /** Closes the panel (translation or clipboard search) currently editing [keyboardTextTarget]. */
+    var closeKeyboardPanel: (() -> Unit)? = null
 
     private fun handleFcitxEvent(event: FcitxEvent<*>) {
         if (keyboardTextTarget?.consume(event) == true) return
@@ -763,7 +764,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
-        closeTranslation?.invoke()
+        closeKeyboardPanel?.invoke()
         keyboardTextTarget = null
         // update selection as soon as possible
         // sometimes when restarting input, onUpdateSelection happens before onStartInput, and
@@ -1089,7 +1090,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
-        closeTranslation?.invoke()
+        closeKeyboardPanel?.invoke()
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
         decorLocationUpdated = false
         inputDeviceMgr.onFinishInputView()
@@ -1106,7 +1107,7 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
     }
 
     override fun onFinishInput() {
-        closeTranslation?.invoke()
+        closeKeyboardPanel?.invoke()
         keyboardTextTarget = null
         pinyinReconversion.reset(false)
         Timber.d("onFinishInput")

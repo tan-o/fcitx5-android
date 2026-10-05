@@ -28,18 +28,12 @@ import com.google.android.material.snackbar.BaseTransientBottomBar.BaseCallback
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.snackbar.SnackbarContentLayout
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import org.fcitx.fcitx5.android.R
-import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardManager
-import org.fcitx.fcitx5.android.data.clipboard.ClipboardSearch
 import org.fcitx.fcitx5.android.data.clipboard.ClipboardTags
-import org.fcitx.fcitx5.android.data.handwriting.HandwritingPinyin
 import org.fcitx.fcitx5.android.data.clipboard.db.ClipboardEntry
 import org.fcitx.fcitx5.android.data.prefs.AppPrefs
 import org.fcitx.fcitx5.android.data.prefs.ManagedPreference
@@ -54,25 +48,23 @@ import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.Transition
 import org.fcitx.fcitx5.android.input.clipboard.ClipboardStateMachine.TransitionEvent.ClipboardListeningUpdated
 import org.fcitx.fcitx5.android.input.dependency.inputMethodService
 import org.fcitx.fcitx5.android.input.dependency.theme
-import org.fcitx.fcitx5.android.input.keyboard.KeyAction
-import org.fcitx.fcitx5.android.input.keyboard.KeyActionListener
 import org.fcitx.fcitx5.android.input.keyboard.KeyboardWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindow
 import org.fcitx.fcitx5.android.input.wm.InputWindowManager
 import org.fcitx.fcitx5.android.utils.AppUtil
-import org.fcitx.fcitx5.android.utils.clipboardManager
 import org.fcitx.fcitx5.android.utils.EventStateMachine
 import org.fcitx.fcitx5.android.utils.item
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.mechdancer.dependency.manager.must
 import splitties.dimensions.dp
-import splitties.resources.styledColor
 import splitties.views.dsl.core.withTheme
 
 class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
     private val service: FcitxInputMethodService by manager.inputMethodService()
     private val windowManager: InputWindowManager by manager.must()
+    private val keyboardWindow: KeyboardWindow
+        get() = windowManager.getEssentialWindow(KeyboardWindow) as KeyboardWindow
     private val theme by manager.theme()
 
     private val snackbarCtx by lazy {
@@ -99,10 +91,8 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
 
     private var adapterSubmitJob: Job? = null
 
-    private var inSearchMode = false
-
-    private var searchQuery = ""
     private var selectedTag: String? = null
+
     private fun submitEntries(pagingSourceFactory: () -> PagingSource<Int, ClipboardEntry>) {
         adapterSubmitJob?.cancel()
         val pager = Pager(PagingConfig(pageSize = 16), pagingSourceFactory = pagingSourceFactory)
@@ -111,67 +101,8 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
         }
     }
 
-    private fun setSearching(on: Boolean) {
-        inSearchMode = on
-        searchQuery = ""
-        ui.setSearchMode(on)
-        ui.updateSearchQuery("")
-        if (on) {
-            submitSearchEntries("")
-        } else {
-            submitTabEntries(ui.tabsUi.activeTab)
-        }
-    }
-
-    private fun updateSearchQuery(query: String) {
-        searchQuery = query
-        ui.updateSearchQuery(query)
-        submitSearchEntries(query)
-    }
-
-    private fun submitSearchEntries(query: String) {
-        adapterSubmitJob?.cancel()
-        adapterSubmitJob = service.lifecycleScope.launch {
-            delay(120)
-            ClipboardManager.observeEntries().collectLatest { entries ->
-                val matches = withContext(Dispatchers.Default) {
-                    entries.filter { ClipboardSearch.matches(it.text, query, HandwritingPinyin::of) }
-                }
-                adapter.submitData(PagingData.from(matches))
-                stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to matches.isEmpty())
-            }
-        }
-    }
-
-    private val searchKeyActionListener: KeyActionListener = KeyActionListener { action, _ ->
-        when (action) {
-            is KeyAction.FcitxKeyAction -> updateSearchQuery(searchQuery + action.act)
-            is KeyAction.CommitAction -> updateSearchQuery(searchQuery + action.text)
-            is KeyAction.LayoutSwitchAction -> ui.switchSearchKeyboard(action.act)
-            is KeyAction.SymAction -> when (val sym = action.sym.sym) {
-                FcitxKeyMapping.FcitxKey_BackSpace -> {
-                    if (searchQuery.isNotEmpty()) {
-                        updateSearchQuery(searchQuery.substring(0, searchQuery.offsetByCodePoints(searchQuery.length, -1)))
-                    }
-                }
-                FcitxKeyMapping.FcitxKey_space -> updateSearchQuery("$searchQuery ")
-                FcitxKeyMapping.FcitxKey_Return -> setSearching(false)
-                in 0xffb0..0xffb9 -> updateSearchQuery(searchQuery + (sym - 0xffb0))
-                0xffab -> updateSearchQuery("$searchQuery+")
-                0xffad -> updateSearchQuery("$searchQuery-")
-                0xffaa -> updateSearchQuery("$searchQuery*")
-                0xffaf -> updateSearchQuery("$searchQuery/")
-                0xffac -> updateSearchQuery("$searchQuery,")
-                0xffae -> updateSearchQuery("$searchQuery.")
-                0xffbd -> updateSearchQuery("$searchQuery=")
-                else -> {}
-            }
-            else -> {}
-        }
-    }
-
     private val loadStateListener: (CombinedLoadStates) -> Unit = {
-        if (!inSearchMode && ui.tabsUi.activeTab == ClipboardTab.Recent &&
+        if (ui.tabsUi.activeTab == ClipboardTab.Recent &&
             it.refresh is androidx.paging.LoadState.NotLoading) {
             val empty = adapter.itemCount == 0
             stateMachine.push(ClipboardDbUpdated, ClipboardDbEmpty to empty)
@@ -301,15 +232,10 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
                 selectedTag = null
                 submitTabEntries(it)
             }
-            searchKeyboards.forEach { it.keyActionListener = searchKeyActionListener }
-            searchBar.setOnLongClickListener {
-                val clip = context.clipboardManager.primaryClip
-                val text = if (clip != null && clip.itemCount > 0) clip.getItemAt(0).coerceToText(context) else null
-                if (text != null) updateSearchQuery(text.toString())
-                true
-            }
             searchButton.setOnClickListener {
-                setSearching(!inSearchMode)
+                // search above the full-size keyboard instead of squeezing a second one in here
+                windowManager.attachWindow(KeyboardWindow)
+                keyboardWindow.openClipboardSearch()
             }
             deleteAllButton.setOnClickListener {
                 service.lifecycleScope.launch {
@@ -413,19 +339,14 @@ class ClipboardWindow : InputWindow.ExtendedInputWindow<ClipboardWindow>() {
         // manually switch to initial ui
         ui.switchUiByState(initialState)
         adapter.addLoadStateListener(loadStateListener)
-        ui.searchKeyboards.forEach { it.onAttach() }
-        ui.updateSearchQuery("")
+        keyboardWindow.closeClipboardSearch()
         submitTabEntries(ui.tabsUi.activeTab)
         clipboardEnabledPref.registerOnChangeListener(clipboardEnabledListener)
     }
 
     override fun onDetached() {
-        inSearchMode = false
-        searchQuery = ""
-        ui.setSearchMode(false)
         clipboardEnabledPref.unregisterOnChangeListener(clipboardEnabledListener)
         adapter.removeLoadStateListener(loadStateListener)
-        ui.searchKeyboards.forEach { it.onDetach() }
         adapter.onDetached()
         adapterSubmitJob?.cancel()
         promptMenu?.dismiss()

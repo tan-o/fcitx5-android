@@ -17,7 +17,11 @@ import org.fcitx.fcitx5.android.data.theme.Theme
 import org.fcitx.fcitx5.android.input.FcitxInputMethodService
 import splitties.dimensions.dp
 
-class TranslationBar(private val service: FcitxInputMethodService, private val theme: Theme) {
+class TranslationBar(
+    private val service: FcitxInputMethodService,
+    private val theme: Theme,
+    private val onLayoutChanged: () -> Unit
+) {
     private var task: Job? = null
     private var balanceJob: Job? = null
     private var target: KeyboardTextTarget? = null
@@ -69,15 +73,17 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         setBackgroundColor(theme.keyboardColor)
         addView(row, LinearLayout.LayoutParams(-1, service.dp(48)))
     }
+    val isOpen: Boolean get() = root.visibility == View.VISIBLE
+
     fun toggle() {
-        if (root.visibility == View.VISIBLE) {
+        if (isOpen) {
             close()
             return
         }
         translate.isEnabled = true
         root.visibility = View.VISIBLE
-        service.requestInputLayout()
-        service.closeTranslation = { close() }
+        onLayoutChanged()
+        service.closeKeyboardPanel = { close() }
         source.setText("")
         source.requestFocus()
         service.finishComposing()
@@ -137,9 +143,9 @@ class TranslationBar(private val service: FcitxInputMethodService, private val t
         if (root.visibility != View.VISIBLE && target == null) return
         task?.cancel()
         balanceJob?.cancel()
-        service.closeTranslation = null
+        service.closeKeyboardPanel = null
         root.visibility = View.GONE
-        service.requestInputLayout()
+        onLayoutChanged()
         val previous = target
         target = null
         service.lifecycleScope.launch {

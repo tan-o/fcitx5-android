@@ -121,7 +121,7 @@ class PopupComponent :
         when (keyboard) {
             is KeyDef.Popup.Keyboard.Preset -> {
                 val configured = if (keyboard.label.singleOrNull()?.isLetter() == true) {
-                    KeyGestureActions.longPress(context, keyboard.label)
+                    KeyGestureActions.customLongPress(context, keyboard.label)
                 } else null
                 items = if (configured != null) {
                     configured.map { KeyDef.Popup.Keyboard.Explicit.Item(it.label, it.action) }.toTypedArray()

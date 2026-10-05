@@ -250,7 +250,9 @@ class UpSwipeSettingsFragment : Fragment() {
         editor: ActionEditor,
         functions: List<LuaScriptManager.FunctionInfo>
     ): String {
-        if (editor.type.selectedItemPosition == 0) return editor.character.text.toString()
+        if (editor.type.selectedItemPosition == 0) {
+            return KeyGestureActions.encodeText(editor.character.text.toString())
+        }
         val selected = editor.function.selectedItemPosition - editor.functionOffset
         check(selected in functions.indices) { "所选 Lua 函数未在脚本中检测到" }
         val name = functions[selected].name
