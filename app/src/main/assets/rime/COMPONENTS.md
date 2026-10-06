@@ -18,3 +18,12 @@ then checks 咁/呀/中/只/找/河 and traditional 語 via librime's global can
 and verifies selected text commits unchanged. The APK gate checks the assets.
 Coverage and decomposition conventions follow Moqi, not a dictionary-standard
 single Kangxi radical for every Unicode character. Device UI validation is separate.
+
+## Character learning
+
+lua/fcitx_char_learning.lua (LGPL-2.1-or-later, this project) is added to every
+schema's processors. When a phrase is assembled from single characters picked one
+at a time, librime's script_translator learns only the phrase; the processor also
+counts each picked character once. It writes inside librime's open user dictionary
+transaction, so Backspace right after the commit still undoes the learning.
+CI checks this with real librime and Mint by exporting the user dictionary.

@@ -18,6 +18,7 @@ class RimeComponentsTest {
         assertEquals("rime_mint", patch["translator/dictionary"])
         assertEquals(listOf("lua_filter@*user_filter", "simplifier@fcitx_components"), patch["engine/filters/+"])
         assertEquals(listOf("radical_pinyin"), patch["schema/dependencies/+"])
+        assertEquals(listOf("lua_processor@*fcitx_char_learning"), patch["engine/processors/+"])
         assertEquals(updated, RimeComponents.patch(updated))
     }
 
@@ -34,6 +35,7 @@ class RimeComponentsTest {
             assertEquals(1234000L, custom.lastModified())
             assertFalse(File(dir, "fcitx_components.dict.yaml").exists())
             assertTrue(File(dir, "opencc/fcitx-components/moqi_chaifen_all.txt").isFile)
+            assertTrue(File(dir, "lua/fcitx_char_learning.lua").isFile)
         } finally { dir.deleteRecursively() }
     }
 

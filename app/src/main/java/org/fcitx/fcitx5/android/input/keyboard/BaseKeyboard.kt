@@ -14,6 +14,7 @@ import androidx.annotation.DrawableRes
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.view.children
 import androidx.core.view.updateLayoutParams
+import org.fcitx.fcitx5.android.R
 import org.fcitx.fcitx5.android.core.FcitxKeyMapping
 import org.fcitx.fcitx5.android.core.InputMethodEntry
 import org.fcitx.fcitx5.android.core.KeyStates
@@ -95,6 +96,9 @@ abstract class BaseKeyboard(
         return handled
     }
     private val inputSwipeThreshold = dp(36f)
+
+    // backspace must travel this many [selectionSwipeThreshold]s upward to arm "delete all"
+    private val deleteAllSwipeSteps = 3
 
     // a rather large threshold effectively disables swipe of the direction
     private val disabledSwipeThreshold = dp(800f)
@@ -210,39 +214,63 @@ abstract class BaseKeyboard(
                 swipeRepeatEnabled = true
                 swipeThresholdX = selectionSwipeThreshold
                 swipeThresholdY = selectionSwipeThreshold
-                var deleteAll = false
+                // Horizontal: select text to delete. Upward: arm "delete all", shown as a bubble;
+                // sliding back down before release disarms it, so nothing is deleted.
+                var selecting = false
+                var vertical = false
+                var deleteAllArmed = false
+                fun setDeleteAllArmed(view: KeyView, armed: Boolean) {
+                    if (armed == deleteAllArmed) return
+                    deleteAllArmed = armed
+                    InputFeedbacks.hapticFeedback(view)
+                    onPopupAction(
+                        if (armed) PopupAction.PreviewAction(
+                            view.id, context.getString(R.string.delete_all), view.bounds
+                        ) else PopupAction.DismissAction(view.id)
+                    )
+                }
                 onGestureListener = OnGestureListener { view, event ->
+                    view as KeyView
                     when (event.type) {
                         GestureType.Down -> {
-                            deleteAll = false
+                            selecting = false
+                            vertical = false
+                            deleteAllArmed = false
                             false
                         }
-                        GestureType.Move -> {
-                            if (event.totalY < 0) {
-                                deleteAll = true
+                        GestureType.Move -> when {
+                            !selecting && (vertical || event.totalY < 0) -> {
+                                vertical = true
+                                setDeleteAllArmed(view, event.totalY <= -deleteAllSwipeSteps)
+                                true
+                            }
+                            event.countX != 0 && !vertical -> {
+                                selecting = true
+                                onAction(KeyAction.MoveSelectionAction(event.countX))
                                 if (hapticOnRepeat) InputFeedbacks.hapticFeedback(view)
                                 true
-                            } else if (deleteAll) {
-                                true
-                            } else {
-                                val count = event.countX
-                                if (count != 0) {
-                                    onAction(KeyAction.MoveSelectionAction(count))
-                                    if (hapticOnRepeat) InputFeedbacks.hapticFeedback(view)
-                                    true
-                                } else false
                             }
+                            else -> selecting
                         }
                         GestureType.Up -> {
-                            if (deleteAll) {
-                                onAction(KeyAction.DeleteAllAction)
-                                true
-                            } else if (event.totalX != 0) {
-                                onAction(KeyAction.DeleteSelectionAction(event.totalX))
-                                true
-                            } else false
+                            val deleteAll = deleteAllArmed && !event.cancelled
+                            if (deleteAllArmed) {
+                                deleteAllArmed = false
+                                onPopupAction(PopupAction.DismissAction(view.id))
+                            }
+                            when {
+                                deleteAll -> {
+                                    onAction(KeyAction.DeleteAllAction)
+                                    true
+                                }
+                                vertical -> true
+                                event.totalX != 0 -> {
+                                    onAction(KeyAction.DeleteSelectionAction(event.totalX))
+                                    true
+                                }
+                                else -> false
+                            }
                         }
-                        else -> false
                     }
                 }
             }

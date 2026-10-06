@@ -2,11 +2,44 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 namespace fs = std::filesystem;
 void require(bool ok, const std::string &message) {
   if (!ok) throw std::runtime_error(message);
+}
+// Selects the first candidate of the current segment whose text is exactly `text`.
+void selectText(RimeApi *api, RimeSessionId session, const std::string &text) {
+  RimeCandidateListIterator iterator{};
+  require(api->candidate_list_begin(session, &iterator), "candidate iterator missing");
+  int matchedIndex = -1;
+  for (int index = 0; index < 500 && api->candidate_list_next(&iterator); ++index) {
+    if (std::string(iterator.candidate.text) == text) {
+      matchedIndex = index;
+      break;
+    }
+  }
+  api->candidate_list_end(&iterator);
+  require(matchedIndex >= 0, "missing candidate: " + text);
+  require(api->select_candidate(session, matchedIndex), "cannot select candidate: " + text);
+}
+// Commit count of a single-character entry in the exported user dictionary snapshot.
+int snapshotCommits(const fs::path &dir, const std::string &text) {
+  for (const auto &file : fs::recursive_directory_iterator(dir / "sync")) {
+    if (file.path().filename() != "rime_mint.userdb.txt") continue;
+    std::ifstream input(file.path());
+    std::string line;
+    while (std::getline(input, line)) {
+      std::istringstream fields(line);
+      std::string code, word, stats;
+      if (!std::getline(fields, code, '\t') || !std::getline(fields, word, '\t') ||
+          !std::getline(fields, stats) || word != text) continue;
+      auto begin = stats.find("c=");
+      if (begin != std::string::npos) return std::stoi(stats.substr(begin + 2));
+    }
+  }
+  return 0;
 }
 int main(int argc, char **argv) {
   try {
@@ -68,9 +101,33 @@ int main(int argc, char **argv) {
       api->free_commit(&commit);
       require(committed == test.text, "component filter changed committed text");
     }
+    // Picking each character of a phrase one at a time must count the characters too,
+    // not only the assembled phrase (fcitx_char_learning.lua).
+    api->clear_composition(session);
+    api->set_option(session, "transcription", false);
+    require(api->simulate_key_sequence(session, "nihao"), "input failed");
+    selectText(api, session, "泥");
+    selectText(api, session, "浩");
+    RIME_STRUCT(RimeCommit, commit);
+    require(api->get_commit(session, &commit), "picked characters did not commit");
+    const std::string picked = commit.text ? commit.text : "";
+    api->free_commit(&commit);
+    require(picked == "泥浩", "unexpected commit of picked characters: " + picked);
     api->destroy_session(session);
+    // Scheme Lua scripts may keep the user dictionary open until shutdown; export it from
+    // a fresh instance so the snapshot can be read.
     api->finalize();
-    std::cout << "All real Mint native OpenCC component and commit cases passed\n";
+    api->initialize(&traits);
+    api->start_maintenance(False);  // loads the deployer tasks used by sync
+    api->join_maintenance_thread();
+    require(api->sync_user_data(), "cannot export user dictionary");
+    api->join_maintenance_thread();
+    for (const char *text : {"泥", "浩"}) {
+      require(snapshotCommits(dir, text) >= 1,
+              std::string("picked character was not learned: ") + text);
+    }
+    api->finalize();
+    std::cout << "All real Mint native OpenCC component, commit and learning cases passed\n";
     return 0;
   } catch (const std::exception &error) {
     std::cerr << error.what() << std::endl;

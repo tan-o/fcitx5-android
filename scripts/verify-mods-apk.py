@@ -16,6 +16,8 @@ with zipfile.ZipFile(apks[0]) as apk:
     for name in ('moqi_chaifen_all.json', 'moqi_chaifen_all.txt'):
         asset = 'rime/opencc/fcitx-components/' + name
         assert apk.read('assets/' + asset) == Path('app/src/main/assets', asset).read_bytes(), asset
+    asset = 'rime/lua/fcitx_char_learning.lua'
+    assert apk.read('assets/' + asset) == Path('app/src/main/assets', asset).read_bytes(), asset
     assert 'assets/rime/fcitx_components.dict.yaml' not in apk.namelist()
     assert 'assets/rime/lua/fcitx_radical_filter.lua' not in apk.namelist()
     descriptor = json.loads(apk.read('assets/descriptor.json'))

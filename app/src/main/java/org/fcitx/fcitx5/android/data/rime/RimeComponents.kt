@@ -5,9 +5,14 @@ import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
 
-/** Rime's native OpenCC filter with the unmodified upstream Moqi decomposition data. */
+/**
+ * Rime's native OpenCC filter with the unmodified upstream Moqi decomposition data, and a
+ * processor that also counts characters picked one at a time (see fcitx_char_learning.lua).
+ */
 internal object RimeComponents {
     private const val Filter = "simplifier@fcitx_components"
+    private const val CharLearning = "lua_processor@*fcitx_char_learning"
+    private const val CharLearningScript = "lua/fcitx_char_learning.lua"
     private const val Option = "_fcitx_components"
     private const val ObsoleteFilter = "lua_filter@*fcitx_radical_filter"
 
@@ -17,6 +22,7 @@ internal object RimeComponents {
             val path = "opencc/fcitx-components/$name"
             writeIfChanged(File(userDir, path), asset(path))
         }
+        writeIfChanged(File(userDir, CharLearningScript), asset(CharLearningScript))
         schemas.filter { it != "fcitx_components" }.forEach { schema ->
             val file = File(userDir, "$schema.custom.yaml")
             val yaml = Yaml(SafeConstructor(LoaderOptions().apply { isAllowDuplicateKeys = false }))
@@ -46,6 +52,10 @@ internal object RimeComponents {
         filters.removeAll { it == ObsoleteFilter || it == Filter }
         filters.add(Filter)
         patch["engine/filters/+"] = filters
+        val processors = list("engine/processors/+")
+        processors.removeAll { it == CharLearning }
+        processors.add(CharLearning)
+        patch["engine/processors/+"] = processors
         // A reset-only switch is internal; it has no toolbar states or menu entry.
         val switches = list("switches/+")
         switches.removeAll { (it as? Map<*, *>)?.get("name") == Option }
