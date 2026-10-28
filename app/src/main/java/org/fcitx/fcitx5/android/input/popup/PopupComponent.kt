@@ -8,6 +8,7 @@ import android.graphics.Rect
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import org.fcitx.fcitx5.android.input.AutoScaleTextView
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -30,6 +31,8 @@ import splitties.views.dsl.core.add
 import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.lParams
 import java.util.LinkedList
+import kotlin.math.ceil
+import kotlin.math.max
 
 class PopupComponent :
     UniqueComponent<PopupComponent>(), Dependent, ManagedHandler by managedHandler() {
@@ -81,24 +84,40 @@ class PopupComponent :
         }
     }
 
-    private fun showPopup(viewId: Int, content: String, bounds: Rect) {
-        showingEntryUi[viewId]?.apply {
-            dismissJobs[viewId]?.also {
-                dismissJobs.remove(viewId)?.cancel()
-            }
-            lastShowTime = System.currentTimeMillis()
-            setText(content)
-            return
-        }
-        val popup = (freeEntryUi.poll()
+    private fun showPopup(viewId: Int, content: String, bounds: Rect, fitContent: Boolean = false) {
+        dismissJobs.remove(viewId)?.cancel()
+        val popup = (showingEntryUi[viewId] ?: freeEntryUi.poll()
             ?: PopupEntryUi(context, theme, popupKeyHeight, popupRadius)).apply {
             lastShowTime = System.currentTimeMillis()
             setText(content)
         }
-        popup.root.layoutParams = FrameLayout.LayoutParams(popupWidth, popupHeight).apply {
-            // align popup bottom with key border bottom [^1]
-            topMargin = bounds.bottom - popupHeight - keyBottomMargin
-            leftMargin = (bounds.left + bounds.right - popupWidth) / 2
+        val padding = if (fitContent) context.dp(12) else 0
+        popup.textView.apply {
+            setPadding(padding, 0, padding, 0)
+            scaleMode = if (fitContent) AutoScaleTextView.Mode.Proportional else AutoScaleTextView.Mode.None
+        }
+        val availableWidth = root.width.takeIf { it > 0 } ?: context.resources.displayMetrics.widthPixels
+        val width = if (fitContent) {
+            max(popupWidth, ceil(popup.textView.paint.measureText(content)).toInt() + padding * 2)
+                .coerceAtMost(availableWidth)
+        } else popupWidth
+        val height = if (fitContent) {
+            max(popupKeyHeight, ceil(popup.textView.paint.fontSpacing).toInt() + context.dp(16))
+        } else popupHeight
+        popup.textView.layoutParams = popup.textView.layoutParams.apply {
+            this.height = if (fitContent) height else popupKeyHeight
+        }
+        popup.root.layoutParams = FrameLayout.LayoutParams(width, height).apply {
+            if (fitContent) {
+                topMargin = (bounds.top - rootBounds.top - height - context.dp(8))
+                    .coerceIn(0, (root.height - height).coerceAtLeast(0))
+                leftMargin = ((bounds.left + bounds.right - width) / 2 - rootBounds.left)
+                    .coerceIn(0, (availableWidth - width).coerceAtLeast(0))
+            } else {
+                // align popup bottom with key border bottom [^1]
+                topMargin = bounds.bottom - popupHeight - keyBottomMargin
+                leftMargin = (bounds.left + bounds.right - popupWidth) / 2
+            }
         }
         // make sure that popup.root does not have parent view before adding it under root container
         // it's wired that on some devices it would have a parent view despite it was newly created
@@ -245,7 +264,7 @@ class PopupComponent :
             when (this) {
                 is PopupAction.ChangeFocusAction -> outResult = changeFocus(viewId, x, y)
                 is PopupAction.DismissAction -> dismissPopup(viewId)
-                is PopupAction.PreviewAction -> showPopup(viewId, content, bounds)
+                is PopupAction.PreviewAction -> showPopup(viewId, content, bounds, fitContent)
                 is PopupAction.PreviewUpdateAction -> updatePopup(viewId, content)
                 is PopupAction.ShowKeyboardAction -> showKeyboard(viewId, keyboard, bounds)
                 is PopupAction.ShowMenuAction -> showMenu(viewId, menu, bounds)

@@ -24,7 +24,7 @@ import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.Backspace
 import org.fcitx.fcitx5.android.input.keyboard.CommonKeyActionListener.BackspaceSwipeState.Stopped
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.CommitAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteSelectionAction
-import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteAllAction
+import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DeleteToBoundaryAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.DateTimeAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.FcitxKeyAction
 import org.fcitx.fcitx5.android.input.keyboard.KeyAction.LangSwitchAction
@@ -190,11 +190,11 @@ class CommonKeyActionListener :
                     }
                     backspaceSwipeState = Stopped
                 }
-                is DeleteAllAction -> {
+                is DeleteToBoundaryAction -> {
                     backspaceSwipeState = Stopped
                     service.postFcitxJob {
                         reset()
-                        service.lifecycleScope.launch { service.deleteAllText() }
+                        service.lifecycleScope.launch { service.deleteToCursorBoundary(action.beforeCursor) }
                     }
                 }
                 is UpSwipeAction -> {

@@ -97,8 +97,8 @@ abstract class BaseKeyboard(
     }
     private val inputSwipeThreshold = dp(36f)
 
-    // backspace must travel this many [selectionSwipeThreshold]s upward to arm "delete all"
-    private val deleteAllSwipeSteps = 3
+    // Travel this many [selectionSwipeThreshold]s vertically before arming deletion.
+    private val deleteBoundarySwipeSteps = 3
 
     // a rather large threshold effectively disables swipe of the direction
     private val disabledSwipeThreshold = dp(800f)
@@ -214,18 +214,21 @@ abstract class BaseKeyboard(
                 swipeRepeatEnabled = true
                 swipeThresholdX = selectionSwipeThreshold
                 swipeThresholdY = selectionSwipeThreshold
-                // Horizontal: select text to delete. Upward: arm "delete all", shown as a bubble;
-                // sliding back down before release disarms it, so nothing is deleted.
+                // Horizontal selects text; up/down arms deletion before/after the cursor.
+                // Returning near the starting point disarms either direction.
                 var selecting = false
                 var vertical = false
-                var deleteAllArmed = false
-                fun setDeleteAllArmed(view: KeyView, armed: Boolean) {
-                    if (armed == deleteAllArmed) return
-                    deleteAllArmed = armed
+                var deleteBeforeCursor: Boolean? = null
+                fun setDeleteDirection(view: KeyView, beforeCursor: Boolean?) {
+                    if (beforeCursor == deleteBeforeCursor) return
+                    deleteBeforeCursor = beforeCursor
                     InputFeedbacks.hapticFeedback(view)
                     onPopupAction(
-                        if (armed) PopupAction.PreviewAction(
-                            view.id, context.getString(R.string.delete_all), view.bounds
+                        if (beforeCursor != null) PopupAction.PreviewAction(
+                            view.id,
+                            context.getString(if (beforeCursor) R.string.delete_before_cursor else R.string.delete_after_cursor),
+                            view.bounds,
+                            fitContent = true
                         ) else PopupAction.DismissAction(view.id)
                     )
                 }
@@ -235,13 +238,17 @@ abstract class BaseKeyboard(
                         GestureType.Down -> {
                             selecting = false
                             vertical = false
-                            deleteAllArmed = false
+                            deleteBeforeCursor = null
                             false
                         }
                         GestureType.Move -> when {
-                            !selecting && (vertical || event.totalY < 0) -> {
+                            !selecting && (vertical || event.totalY != 0) -> {
                                 vertical = true
-                                setDeleteAllArmed(view, event.totalY <= -deleteAllSwipeSteps)
+                                setDeleteDirection(view, when {
+                                    event.totalY <= -deleteBoundarySwipeSteps -> true
+                                    event.totalY >= deleteBoundarySwipeSteps -> false
+                                    else -> null
+                                })
                                 true
                             }
                             event.countX != 0 && !vertical -> {
@@ -253,14 +260,14 @@ abstract class BaseKeyboard(
                             else -> selecting
                         }
                         GestureType.Up -> {
-                            val deleteAll = deleteAllArmed && !event.cancelled
-                            if (deleteAllArmed) {
-                                deleteAllArmed = false
+                            val direction = deleteBeforeCursor.takeUnless { event.cancelled }
+                            if (deleteBeforeCursor != null) {
+                                deleteBeforeCursor = null
                                 onPopupAction(PopupAction.DismissAction(view.id))
                             }
                             when {
-                                deleteAll -> {
-                                    onAction(KeyAction.DeleteAllAction)
+                                direction != null -> {
+                                    onAction(KeyAction.DeleteToBoundaryAction(direction))
                                     true
                                 }
                                 vertical -> true

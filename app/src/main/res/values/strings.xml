@@ -324,6 +324,8 @@
     <string name="move_cursor_to_end">Move cursor to end</string>
     <string name="open_input_method_settings">Open input method settings</string>
     <string name="delete_all">Delete all</string>
+    <string name="delete_before_cursor">Delete all before cursor</string>
+    <string name="delete_after_cursor">Delete all after cursor</string>
     <string name="share">Share</string>
     <string name="emoji_and_symbols">Emoji &amp; Symbols</string>
     <string name="default_emoji_skin_tone">Default emoji skin tone modifier</string>

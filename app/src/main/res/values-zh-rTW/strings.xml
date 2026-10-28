@@ -302,6 +302,8 @@
     <string name="move_cursor_to_end">將游標移動到最後方</string>
     <string name="open_input_method_settings">打開輸入法設定</string>
     <string name="delete_all">全部刪除</string>
+    <string name="delete_before_cursor">刪除游標左側全部</string>
+    <string name="delete_after_cursor">刪除游標右側全部</string>
     <string name="share">分享</string>
     <string name="emoji_and_symbols">表情和符號</string>
     <string name="default_emoji_skin_tone">默認表情膚色修改</string>

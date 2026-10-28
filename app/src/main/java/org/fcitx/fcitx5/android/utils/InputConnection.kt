@@ -14,6 +14,17 @@ fun InputConnection.withBatchEdit(block: InputConnection.() -> Unit) {
     endBatchEdit()
 }
 
+/** Delete one side without reading a potentially truncated snapshot of the editor. */
+fun InputConnection.deleteToCursorBoundary(start: Int, end: Int, beforeCursor: Boolean): Boolean {
+    if (start < 0 || end < start) return false
+    finishComposingText()
+    // Leave selected text intact. Bound the forward request so end + afterLength cannot overflow.
+    return deleteSurroundingText(
+        if (beforeCursor) start else 0,
+        if (beforeCursor) 0 else Int.MAX_VALUE - end
+    )
+}
+
 fun InputConnection.monitorCursorAnchor(enable: Boolean = true): Boolean {
     if (!enable) {
         requestCursorUpdates(0)

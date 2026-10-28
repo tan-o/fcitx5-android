@@ -66,6 +66,18 @@ class KeyboardTextTarget(
         composingEnd = -1
     }
 
+    fun deleteToCursorBoundary(beforeCursor: Boolean) {
+        val selected = selection()
+        // Keep selected text, matching InputConnection.deleteSurroundingText.
+        val range = if (beforeCursor) 0..selected.first else selected.last..editor.text.length
+        editor.text.delete(range.first, range.last)
+        val start = if (beforeCursor) 0 else selected.first
+        val end = if (beforeCursor) selected.last - selected.first else selected.last
+        Selection.setSelection(editor.text, start, end)
+        composingStart = -1
+        composingEnd = -1
+    }
+
     private fun moveCursor(offset: Int) {
         val selected = selection()
         val cursor = if (offset < 0) selected.first else selected.last

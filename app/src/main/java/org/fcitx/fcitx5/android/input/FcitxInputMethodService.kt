@@ -75,6 +75,7 @@ import org.fcitx.fcitx5.android.utils.monitorCursorAnchor
 import org.fcitx.fcitx5.android.utils.styledColorOrDefault
 import org.fcitx.fcitx5.android.utils.styledFloat
 import org.fcitx.fcitx5.android.utils.withBatchEdit
+import org.fcitx.fcitx5.android.utils.deleteToCursorBoundary
 import splitties.bitflags.hasFlag
 import splitties.dimensions.dp
 import splitties.resources.styledColor
@@ -517,13 +518,18 @@ class FcitxInputMethodService : LifecycleInputMethodService() {
         currentInputConnection?.commitText("", 1)
     }
 
-    fun deleteAllText() {
+    fun deleteToCursorBoundary(beforeCursor: Boolean) {
+        keyboardTextTarget?.let { it.deleteToCursorBoundary(beforeCursor); return }
+        val ic = currentInputConnection ?: return
+        val (start, end) = selection.latest
+        if (start < 0 || end < 0) return
         resetComposingState()
-        currentInputConnection?.withBatchEdit {
-            performContextMenuAction(android.R.id.selectAll)
-            commitText("", 1)
+        ic.withBatchEdit {
+            if (deleteToCursorBoundary(start, end, beforeCursor)) {
+                if (beforeCursor) selection.predict(0, end - start)
+                else selection.predict(start, end)
+            }
         }
-        selection.resetTo(0)
     }
 
     fun sendCombinationKeyEvents(

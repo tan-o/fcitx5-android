@@ -41,7 +41,7 @@ sealed class KeyAction {
 
     data class DeleteSelectionAction(val totalCnt: Int = 0) : KeyAction()
 
-    data object DeleteAllAction : KeyAction()
+    data class DeleteToBoundaryAction(val beforeCursor: Boolean) : KeyAction()
 
     data class UpSwipeAction(val key: String) : KeyAction()
 
